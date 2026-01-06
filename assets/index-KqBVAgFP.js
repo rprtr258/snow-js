@@ -33,7 +33,7 @@ vec4 mainImage(in vec2 fragCoord) {
   vec2 p = fragCoord.xy / iResolution.x;
   float snow = 0.0;
 
-  p += (vec2(-iMouse.x, +iMouse.y) / iResolution - 0.5) / 10.0;
+  // p += (vec2(-iMouse.x, +iMouse.y) / iResolution - 0.5) / 10.0;
 
   vec4 gradient = (1.0 - p.y) * gradientIntensity * iGradient;
 
