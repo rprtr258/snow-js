@@ -1,0 +1,23 @@
+{
+  "name": "snow-js",
+  "module": "index.ts",
+  "type": "module",
+  "scripts": {
+    "dev:website": "bun run dev --filter=./website",
+    "lint": "eslint '**/*.{ts,json}' && tsc -p tsconfig.json",
+    "lint:fix": "eslint '**/*.{ts,json}' --fix"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "vite": "^7.3.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5",
+    "@eslint/js": "^9.39.2",
+    "@stylistic/eslint-plugin": "^5.6.1",
+    "eslint": "^9.39.2",
+    "eslint-plugin-import": "^2.32.0",
+    "jiti": "^2.6.1",
+    "typescript-eslint": "^8.52.0"
+  }
+}
