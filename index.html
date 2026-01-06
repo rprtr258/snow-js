@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>snow-js</title>
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>❄️</text></svg>">
+  <link rel="stylesheet" href="/index.css">
+  <style>
+    body {
+      font-family: -apple-system, system-ui, BlinkMacSystemFont, 'Segoe UI', 'Open Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      line-height: 1;
+      user-select: none;
+      overscroll-behavior: none;
+    }
+
+    .container {
+      position: fixed;
+      width: 240px;
+      height: inherit;
+      background: hsla(0, 0%, 10%, 1);
+      top: 50%;
+      left: 50%;
+      margin: -120px 0 0 -120px;
+      padding: 20px;
+      border-radius: 4px;
+      box-sizing: border-box;
+      font-size: 20px;
+      z-index: 1;
+      opacity: 0.9;
+      line-height: initial;
+    }
+    .container div {
+      text-align: center;
+      font-size: 3rem;
+    }
+    .container h1 {
+      font-size: 1.8em;
+      text-align: center;
+      color: #ffffff;
+      margin: 0;
+    }
+    .container h2 {
+      font-weight: 400;
+      font-size: 16px;
+      margin-bottom: 10px;
+      text-align: center;
+      color: #ffffff;
+    }
+    .container a {
+      width: 100%;
+      text-align: center;
+      line-height: 36px;
+      background: #ffffff;
+      margin-top: 10px;
+      color: #222;
+      border-radius: 4px;
+      display: inline-block;
+      font-size: 16px;
+      font-weight: 500;
+      transition-duration: 0.1s;
+      text-decoration: none;
+    }
+    .container a:hover {
+      transition: ease-in color;
+      background: #222;
+      color: hsla(0, 0%, 70%, 1);
+    }
+
+    .snow-container {
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background: #000000;
+      background-size: cover;
+      background-position: 50% 50%;
+      background-repeat: no-repeat;
+    }
+
+    :root {
+      --tp-base-background-color: hsla(0, 0%, 0%, 0.75);
+      --tp-base-shadow-color: hsla(0, 0%, 0%, 0.2);
+      --tp-button-background-color: hsla(0, 0%, 70%, 1);
+      --tp-button-background-color-active: hsla(0, 0%, 85%, 1);
+      --tp-button-background-color-focus: hsla(0, 0%, 80%, 1);
+      --tp-button-background-color-hover: hsla(0, 0%, 75%, 1);
+      --tp-button-foreground-color: hsla(0, 0%, 0%, 1);
+      --tp-container-background-color: hsla(0, 0%, 10%, 1);
+      --tp-container-background-color-active: hsla(0, 0%, 25%, 1);
+      --tp-container-background-color-focus: hsla(0, 0%, 20%, 1);
+      --tp-container-background-color-hover: hsla(0, 0%, 15%, 1);
+      --tp-container-foreground-color: hsla(0, 0%, 50%, 1);
+      --tp-groove-foreground-color: hsla(0, 0%, 10%, 1);
+      --tp-input-background-color: hsla(0, 0%, 10%, 1);
+      --tp-input-background-color-active: hsla(0, 0%, 25%, 1);
+      --tp-input-background-color-focus: hsla(0, 0%, 20%, 1);
+      --tp-input-background-color-hover: hsla(0, 0%, 15%, 1);
+      --tp-input-foreground-color: hsla(0, 0%, 70%, 1);
+      --tp-label-foreground-color: hsla(0, 0%, 50%, 1);
+      --tp-monitor-background-color: hsla(0, 0%, 8%, 1);
+      --tp-monitor-foreground-color: hsla(0, 0%, 48%, 1);
+    }
+  </style>
+  <script type="module" crossorigin src="./assets/index-DXmhFxjD.js"></script>
+</head>
+
+<body>
+  <div class="container">
+    <div>❄️</div>
+    <h1>snow-js</h1>
+    <h2>A simple snow library!</h2>
+    <a href="https://github.com/rprtr258/snow-js/" target="_blank">
+      <span class="label">Visit on GitHub</span>
+    </a>
+  </div>
+  <div class="snow-container"></div>
+</body>
+
+</html>
