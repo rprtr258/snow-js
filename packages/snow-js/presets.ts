@@ -8,7 +8,7 @@ void main() {
 
 // http://www.pouet.net/prod.php?which=57245
 const FRAGMENT_GLSL_ = `
-precision mediump float;
+precision highp float;
 
 uniform float iTime;
 uniform vec2 iResolution;
@@ -41,7 +41,7 @@ void FRAGMENT_GLSL_;
 
 // https://www.shadertoy.com/view/ldsGDn
 const FRAGMENT_GLSL__ = `
-precision mediump float;
+precision highp float;
 
 #define LIGHT_SNOW // Comment this out for a blizzard
 
@@ -109,7 +109,7 @@ export const defaultOptions: Options = {
 
 // https://www.shadertoy.com/view/4sX3z2
 export const FRAGMENT_GLSL = `
-precision mediump float;
+precision highp float;
 
 uniform float iTime;
 uniform vec2 iResolution;
