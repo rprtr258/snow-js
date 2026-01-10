@@ -9,7 +9,7 @@ void main() {
   gl_Position = vec4(aVertexPosition, 1.0);
 }
 `,Jn={isDark:0,gradientIntensity:.05,iGradient:[0,.8,1,1],amount:.08,size:.8,opacity:1.5},Pb=`
-precision mediump float;
+precision highp float;
 
 uniform float iTime;
 uniform vec2 iResolution;
