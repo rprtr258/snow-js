@@ -529,6 +529,9 @@ export class PortalSimulation {
   // game behavior; scaled views pass their world→pixel scale so on-screen
   // particle density matches one cell = one pixel.
   declare density: number;
+  // Presentation-only opt-out (SimulationOptions.ambientRing) for the ambient
+  // ring halo; default true keeps the ported emission.
+  declare ambientRing: boolean;
   // Optional surface of specialized simulations; the base class leaves them
   // unset so polymorphic callers can probe which kind of body is running.
   declare definition?: {sprites?: SpriteSpec[]; lifetime?: number};
@@ -556,6 +559,7 @@ export class PortalSimulation {
     retainInvisible = true,
     density = this.density ?? 1,
     minTrailLifetime = 0,
+    ambientRing = true,
   }: SimulationOptions = {}) {
     if (!Object.prototype.hasOwnProperty.call(EFFECTS, effect))
       throw new RangeError("Unknown portal effect");
@@ -602,6 +606,7 @@ export class PortalSimulation {
       dropped: 0,
       totalEmitted: 0,
       density,
+      ambientRing,
     });
     // Authored presentation floor (meditation page); only ever lengthens the
     // native trail, never shortens it.
@@ -721,7 +726,10 @@ export class PortalSimulation {
   step() {
     // on-added schedules frame + interval - 1; subsequent intervals are 12.
     const ambientRing = this.effect === "eye_room" ? eyeRing : ring;
-    if (this.elapsedFrames % ambientRing.interval === ambientRing.interval - 1)
+    if (
+      this.ambientRing &&
+      this.elapsedFrames % ambientRing.interval === ambientRing.interval - 1
+    )
       this.emitBatch(ambientRing, this.x, this.y);
     if (this.elapsedFrames % mote.interval === mote.interval - 1)
       this.emitBatch(mote, this.x, this.y);

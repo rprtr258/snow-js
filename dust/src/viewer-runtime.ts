@@ -22,6 +22,8 @@ export function normalizeOptions(options: RawOptions): NormalizedOptions {
     background: validateColor(options.background),
     monochrome: !!options.monochrome,
     smoothGlow: !!options.smoothGlow,
+    // Absent means drawn: every existing page relies on the portal sprite.
+    portalSprite: options.portalSprite !== false,
   };
 }
 export function renderOptions(options: NormalizedOptions) {
@@ -32,6 +34,7 @@ export function renderOptions(options: NormalizedOptions) {
     background: packColor(options.background) ?? 0,
     monochrome: options.monochrome,
     smoothGlow: options.smoothGlow,
+    portalSprite: options.portalSprite,
   };
 }
 export class ViewerRuntime {

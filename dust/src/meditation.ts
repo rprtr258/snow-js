@@ -10,10 +10,15 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 const canvas = $<HTMLCanvasElement>("canvas");
 const context = canvas.getContext("2d", { alpha: false });
 if (!context) throw new Error("Canvas 2D is unavailable in this browser.");
-const options: RawOptions = { core: true, glow: false, color: null, background: null };
+const options: RawOptions = { core: true, glow: false, color: null, background: null, portalSprite: false };
+// portalSprite: false drops the catalog teleport_center.png ring graphic drawn
+// additively at the portal center; only particle rendering remains.
 // minTrailLifetime: every particle lives at least 500ms (the native trail
 // lifeMin is 0.35s, which lets dots blink out sooner).
-const replay: SimulationOptions = { worldSeed: 0, x: 0, y: 0, startFrame: 0, effect: "meditation", mathTrailScale: 3, minTrailLifetime: 5.5 };
+// ambientRing: false drops the radial ring sparks around the cube; only the
+// cube trail and the center motes render. Skipping the batch also shifts the
+// shared RNG stream, so trail spark placement differs from the native replay.
+const replay: SimulationOptions = { worldSeed: 0, x: 0, y: 0, startFrame: 0, effect: "meditation", mathTrailScale: 3, minTrailLifetime: 5.5, ambientRing: false };
 
 type Layout = {width: number; height: number; scale: number};
 type WorkerMessage = {

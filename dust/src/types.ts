@@ -244,6 +244,9 @@ export type RawOptions = {
   background?: unknown;
   monochrome?: unknown;
   smoothGlow?: unknown;
+  // Presentation-only opt-out for the catalog portal ring sprite
+  // (teleport_center.png); the meditation page draws particles only.
+  portalSprite?: unknown;
 };
 export type NormalizedOptions = {
   core: boolean;
@@ -252,6 +255,7 @@ export type NormalizedOptions = {
   background: string | null;
   monochrome: boolean;
   smoothGlow: boolean;
+  portalSprite: boolean;
 };
 export type RuntimeOptionsState = {core?: unknown; glow?: unknown};
 export type FrameRequest = {
@@ -320,6 +324,10 @@ export type SimulationOptions = {
   // Scaled views pass the world→pixel scale so particle counts and trail
   // sampling stay as dense on screen as they are at one cell = one pixel.
   density?: number;
+  // Presentation-only opt-out for the ambient ring halo around the body
+  // (the meditation page renders the cube and motes alone). Default true:
+  // emitted, as in the game.
+  ambientRing?: boolean;
   imageEmitter?: ImageEmitterOptions;
   imageOnce?: boolean;
   custom_image?: boolean;

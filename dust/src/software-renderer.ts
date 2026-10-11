@@ -156,6 +156,8 @@ export type RenderOptions = {
   background?: number;
   monochrome?: boolean;
   smoothGlow?: boolean;
+  // Presentation-only opt-out for the catalog portal ring sprite; default true.
+  portalSprite?: boolean;
 };
 export class SoftwareRenderer {
   declare width: number;
@@ -768,7 +770,7 @@ export class SoftwareRenderer {
   }
   render(
     sim: PortalSimulation,
-    { core = true, glow = true, color = null, background = 0, monochrome = false, smoothGlow = false }: RenderOptions = {},
+    { core = true, glow = true, color = null, background = 0, monochrome = false, smoothGlow = false, portalSprite = true }: RenderOptions = {},
     advance = true,
     outputBuffer: ArrayBufferLike | null = null,
   ) {
@@ -833,7 +835,7 @@ export class SoftwareRenderer {
       }
       const sprites =
         sim.definition?.sprites ??
-        (sim.effect.startsWith("math_") ? [] : [this.catalog.portalSprite]);
+        (sim.effect.startsWith("math_") || !portalSprite ? [] : [this.catalog.portalSprite]);
       for (const sprite of sprites) if (!sprite.emissive) this.drawSprite(sprite, sim);
     }
     for (const p of sim.spriteParticles ?? [])
@@ -906,7 +908,7 @@ export class SoftwareRenderer {
     this.afterGlow = true;
     if (core) {
       const sprites = sim.definition?.sprites ??
-        (sim.effect.startsWith("math_") ? [] : [this.catalog.portalSprite]);
+        (sim.effect.startsWith("math_") || !portalSprite ? [] : [this.catalog.portalSprite]);
       for (const sprite of sprites) if (sprite.emissive) this.drawSprite(sprite, sim);
     }
     for (const p of sim.spriteParticles ?? [])
