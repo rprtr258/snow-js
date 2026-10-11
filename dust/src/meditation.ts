@@ -19,7 +19,13 @@ const options: RawOptions = { core: true, glow: false, color: null, background: 
 // ambientRing: false drops the radial ring sparks around the cube; only the
 // cube trail and the center motes render. Skipping the batch also shifts the
 // shared RNG stream, so trail spark placement differs from the native replay.
-const replay: SimulationOptions = { worldSeed: 0, x: 0, y: 0, startFrame: 0, effect: "meditation", mathTrailScale: 3, minTrailLifetime: 5.5, ambientRing: false };
+// fastParticles opts this page into the float64 particle integration
+// (stepParticleFast): the RNG stream, emission counts and lifetimes are
+// identical to the fround reference, but positions may drift within the
+// visual bounds enforced by `bun scripts/render-diff.ts` (the exact-path
+// reference renderer and every other consumer stay byte-exact). Chosen
+// deliberately for this page: speed over bit-exactness.
+const replay: SimulationOptions = { worldSeed: 0, x: 0, y: 0, startFrame: 0, effect: "meditation", mathTrailScale: 3, minTrailLifetime: 3.5, ambientRing: false, fastParticles: true };
 
 type Layout = {width: number; height: number; scale: number};
 type WorkerMessage = {
