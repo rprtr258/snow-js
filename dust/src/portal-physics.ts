@@ -316,14 +316,36 @@ export function stepParticle(p: Particle, time: number, dt = DT) {
   return p.life >= 0;
 }
 
+// Fast-path trig: 16384-step sin table for the per-particle airflow (the only
+// Math.sin/cos pair in the hot loop). cos(a) = sin(a + π/2) from the same
+// table. Indexing biases by 2³⁰ so the ToInt32 in the &-mask floors a
+// positive value (exact truncation = floor), wrapping via power-of-two mask;
+// the +¼ table for cos stays within the appended quarter. Max lookup error is
+// one table step ≈ 3.8e-4 rad → force error ≤ 1e-4 world units/frame;
+// scripts/render-diff.ts gates bound the resulting drift (measured worst
+// mean |ΔRGB| 0.017, p99.9 0, 0.03 % differing pixels over 600 preview
+// frames — an order of magnitude inside every gate).
+const SIN_LUT_STEPS = 16384;
+const SIN_LUT_MASK = SIN_LUT_STEPS - 1;
+const SIN_LUT_QUARTER = SIN_LUT_STEPS / 4;
+const SIN_LUT_TO_INDEX = SIN_LUT_STEPS / (2 * Math.PI);
+const SIN_LUT_BIAS = 0x40000000; // 2³⁰: keeps the masked ToInt32 flooring
+const SIN_LUT = new Float64Array(SIN_LUT_STEPS + SIN_LUT_QUARTER + 1);
+for (let i = 0; i < SIN_LUT.length; i++)
+  SIN_LUT[i] = Math.sin((i * 2 * Math.PI) / SIN_LUT_STEPS);
+
 // Float64 twin of stepParticle for the opt-in fastParticles path
-// (SimulationOptions): same branch structure and field updates — including
-// the prevX/prevY stroke bookkeeping and the `life >= 0` return contract —
-// with every Math.fround dropped and the per-particle constant flags
+// (SimulationOptions): same branch structure and field updates — with every
+// Math.fround dropped and the per-particle constant flags
 // (friction, attractor, airflowForce) read once instead of inside the
 // expression tree. The common portal profile (friction 0, no attractor,
 // airflow on — every particle the portal emitters produce) runs in one
-// specialized branch. Purely numeric: it calls no RNG and touches no
+// specialized branch with three render-invisible shortcuts: the airflow
+// sincos pair comes from SIN_LUT (bounded drift, gates above), the alpha
+// clamp is skipped when fadeRate is 0 (alpha then never changes; every emit
+// starts inside [0,1]), and the prevX/prevY stroke bookkeeping runs only for
+// drawLong particles (particleQuad — its only reader — touches prev only in
+// the drawLong branch). Purely numeric: it calls no RNG and touches no
 // emission state, so RNG streams, emission counts and lifetimes are
 // identical to stepParticle; positions/velocities drift within the bounds
 // enforced by scripts/render-diff.ts. The fround stepParticle above stays
@@ -338,23 +360,32 @@ export function stepParticleFast(p: Particle, time: number, dt = DT) {
     const airflowScale = p.airflowScale;
     const nx = p.x + p.vx * dt,
       ny = p.y + p.vy * dt;
-    p.alpha = Math.min(1, Math.max(0, p.alpha + p.fadeRate * dt));
+    // fadeRate 0 never changes alpha (emissions start inside [0,1]), so the
+    // clamped rewrite is a no-op worth skipping on the hot path.
+    if (p.fadeRate !== 0)
+      p.alpha = Math.min(1, Math.max(0, p.alpha + p.fadeRate * dt));
     p.vx += p.gx * dt;
     p.vy += p.gy * dt;
     const angle = simplex3(nx * airflowScale, ny * airflowScale, time) * Math.PI;
-    p.vx -= Math.sin(angle) * airflowForce;
-    p.vy += Math.cos(angle) * airflowForce;
+    const k = angle * SIN_LUT_TO_INDEX + SIN_LUT_BIAS;
+    p.vx -= SIN_LUT[k & SIN_LUT_MASK] * airflowForce;
+    p.vy += SIN_LUT[(k + SIN_LUT_QUARTER) & SIN_LUT_MASK] * airflowForce;
     p.life -= dt;
-    const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy),
-      dx = p.x - nx,
-      dy = p.y - ny,
-      distance = Math.sqrt(dx * dx + dy * dy),
-      tx = distance > 0 ? dx / distance : 0,
-      ty = distance > 0 ? dy / distance : 0;
     p.x = nx;
     p.y = ny;
-    p.prevX = tx * speed * dt + nx;
-    p.prevY = ny + ty * speed * dt;
+    if (p.drawLong) {
+      // Stroke bookkeeping; only drawLong quads (particleQuad's drawLong
+      // branch) ever read prevX/prevY, so skipping it elsewhere is
+      // output-invariant.
+      const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy),
+        dx = p.x - nx,
+        dy = p.y - ny,
+        distance = Math.sqrt(dx * dx + dy * dy),
+        tx = distance > 0 ? dx / distance : 0,
+        ty = distance > 0 ? dy / distance : 0;
+      p.prevX = tx * speed * dt + nx;
+      p.prevY = ny + ty * speed * dt;
+    }
     return p.life >= 0;
   }
   const nx = p.x + p.vx * dt,
@@ -610,6 +641,9 @@ export class PortalSimulation {
   // Opt-in float64 particle integration (SimulationOptions.fastParticles);
   // default false keeps the byte-exact fround reference.
   declare fastParticles: boolean;
+  // Opt-in drop of never-visible particles (SimulationOptions.cullInvisible);
+  // default false keeps the native retention semantics.
+  declare cullInvisible: boolean;
   // Optional surface of specialized simulations; the base class leaves them
   // unset so polymorphic callers can probe which kind of body is running.
   declare definition?: {sprites?: SpriteSpec[]; lifetime?: number};
@@ -639,6 +673,7 @@ export class PortalSimulation {
     minTrailLifetime = 0,
     ambientRing = true,
     fastParticles = false,
+    cullInvisible = false,
   }: SimulationOptions = {}) {
     if (!Object.prototype.hasOwnProperty.call(EFFECTS, effect))
       throw new RangeError("Unknown portal effect");
@@ -687,6 +722,7 @@ export class PortalSimulation {
       density,
       ambientRing,
       fastParticles,
+      cullInvisible,
     });
     // Authored presentation floor (meditation page); only ever lengthens the
     // native trail, never shortens it.
@@ -844,15 +880,21 @@ export class PortalSimulation {
       const p = particles[read];
       if (!this.retainInvisible && p.alpha === 0 && p.fadeRate <= 0) {
         // In the isolated air model these particles can never become visible or influence another.
-        // Keep age/lifetime/capacity and all RNG calls intact; skip only unobservable motion.
-        p.age++;
-        // The fast path decrements in float64: the cull comparison may shift
-        // by an ulp-era frame, which the render-diff drift gates bound; the
-        // lifetime value itself (fixed at emission) is untouched.
-        p.life = fast ? p.life - DT : Math.fround(p.life - DT);
-        if (p.life >= 0) {
-          if (write !== read) particles[write] = p;
-          write++;
+        // cullInvisible drops them outright — output-invariant (they render
+        // nothing, interact with nothing, consume no RNG) but pool size and
+        // age/lifetime bookkeeping then differ from the native retention.
+        // Without the flag: keep age/lifetime/capacity and all RNG calls
+        // intact; skip only unobservable motion.
+        if (!this.cullInvisible) {
+          p.age++;
+          // The fast path decrements in float64: the cull comparison may shift
+          // by an ulp-era frame, which the render-diff drift gates bound; the
+          // lifetime value itself (fixed at emission) is untouched.
+          p.life = fast ? p.life - DT : Math.fround(p.life - DT);
+          if (p.life >= 0) {
+            if (write !== read) particles[write] = p;
+            write++;
+          }
         }
       } else if (step(p, this.time)) {
         if (write !== read) particles[write] = p;

@@ -45,8 +45,12 @@ export const MEDITATION_RENDER = {
 // The meditation page's replay (src/meditation.ts). The worker's
 // ViewerRuntime.restart additionally forces retainInvisible: false on every
 // replay. density tracks the world→pixel scale (replay.density = scale*2).
-// Keep the options in sync with the page; fastParticles is always explicit
-// here so harness modes never depend on the page's current default.
+// cullInvisible is always on to match the page; it is output-invariant (the
+// dropped particles render nothing, interact with nothing, consume no RNG),
+// so the exact-regression baseline recorded without the flag must still
+// hash-match — that gate doubles as the invariance proof. fastParticles is
+// always explicit here so harness modes never depend on the page's current
+// default.
 export function meditationReplay(
   width: number,
   height: number,
@@ -65,6 +69,7 @@ export function meditationReplay(
     density: scale * 2,
     retainInvisible: false,
     fastParticles,
+    cullInvisible: true,
   };
 }
 

@@ -25,7 +25,11 @@ const options: RawOptions = { core: true, glow: false, color: null, background: 
 // visual bounds enforced by `bun scripts/render-diff.ts` (the exact-path
 // reference renderer and every other consumer stay byte-exact). Chosen
 // deliberately for this page: speed over bit-exactness.
-const replay: SimulationOptions = { worldSeed: 0, x: 0, y: 0, startFrame: 0, effect: "meditation", mathTrailScale: 3, minTrailLifetime: 3.5, ambientRing: false, fastParticles: true };
+// cullInvisible drops particles once alpha reaches 0 (fade-out complete);
+// they can never render again, so the image is unchanged, but the pool stays
+// at the visible population instead of the native retention to life expiry
+// (the debug overlay's particle count reflects that).
+const replay: SimulationOptions = { worldSeed: 0, x: 0, y: 0, startFrame: 0, effect: "meditation", mathTrailScale: 3, minTrailLifetime: 3.5, ambientRing: false, fastParticles: true, cullInvisible: true };
 
 type Layout = {width: number; height: number; scale: number};
 type WorkerMessage = {

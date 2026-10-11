@@ -334,6 +334,14 @@ export type SimulationOptions = {
   // reference. Numeric drift only, bounded by scripts/render-diff.ts gates;
   // the RNG stream, emission counts and lifetimes are identical.
   fastParticles?: boolean;
+  // Presentation-only cull for the same air model: drop particles that can
+  // never render again (alpha exactly 0 with a non-positive fade rate)
+  // instead of retaining them to lifetime expiry on the cheap advance path.
+  // Output-invariant — such particles render nothing, interact with nothing
+  // and consume no RNG — but pool size and age/lifetime bookkeeping then
+  // differ from the native retention. Opt-in (meditation page); has no
+  // effect unless retainInvisible is false. Defaults off.
+  cullInvisible?: boolean;
   imageEmitter?: ImageEmitterOptions;
   imageOnce?: boolean;
   custom_image?: boolean;
