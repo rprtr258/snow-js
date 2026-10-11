@@ -555,6 +555,7 @@ export class PortalSimulation {
     startTime = Math.fround(startFrame / 60),
     retainInvisible = true,
     density = this.density ?? 1,
+    minTrailLifetime = 0,
   }: SimulationOptions = {}) {
     if (!Object.prototype.hasOwnProperty.call(EFFECTS, effect))
       throw new RangeError("Unknown portal effect");
@@ -568,6 +569,7 @@ export class PortalSimulation {
         lifetimeSeed,
         startTime,
         density,
+        minTrailLifetime,
       ].every(Number.isFinite) ||
       !Number.isSafeInteger(startFrame) ||
       startFrame < 0 ||
@@ -601,6 +603,12 @@ export class PortalSimulation {
       totalEmitted: 0,
       density,
     });
+    // Authored presentation floor (meditation page); only ever lengthens the
+    // native trail, never shortens it.
+    this.trailEmission =
+      minTrailLifetime > trail.lifeMin
+        ? Object.freeze({ ...trail, lifeMin: minTrailLifetime })
+        : undefined;
     this.retainInvisible = retainInvisible;
     this.emissionRng = new EmissionRandom(emissionSeed);
     this.lifetimeRng = new NoitaRandom(lifetimeSeed);
@@ -674,6 +682,10 @@ export class PortalSimulation {
       airflowForce: config.force,
       airflowScale: config.scale,
       drawLong: config.drawLong ?? false,
+      // Scaled views emit sub-cell trail steps; snapping their quads back to
+      // world cells (the density-1 native rendering) re-quantizes the ~half
+      // pixel spacing into a coarse visible lattice. Only scaled views opt out.
+      onGrid: previous && this.density > 1 ? false : undefined,
     });
     this.totalEmitted++;
   }
@@ -722,7 +734,7 @@ export class PortalSimulation {
         this.loopFrames,
       );
       for (const [i, point] of this.points.entries()) {
-        this.emitTrail(this.previousPoints[i], point);
+        this.emitTrail(this.previousPoints[i], point, this.trailEmission);
       }
     }
     if (this.effect === "eye_room") {

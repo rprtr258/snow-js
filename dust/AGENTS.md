@@ -31,10 +31,7 @@ scale changes.
 
 ## Verifying
 
-There is no test suite. Run `bun run typecheck` and `bun run build`, then load a
-page and inspect the canvas: the figure stays on the buffer's midpoint at every
-`RESOLUTION_SCALE`, so a clipped or off-centre figure means the buffer and
-display sizes disagree.
+There is no test suite. Run `bun run typecheck` and `bun run build`.
 
 `bun run dev` watches `src/` and `static/`, rebuilds `dist/`, and reloads the
 browser — a manual build alongside it **races** the watcher, and browsers cache

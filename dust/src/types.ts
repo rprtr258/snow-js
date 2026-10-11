@@ -313,6 +313,9 @@ export type SimulationOptions = {
   retainInvisible?: boolean;
   loopFrames?: number;
   mathTrailScale?: number;
+  // Presentation-only floor for the meditation trail lifetime, in seconds.
+  // At or below the ported lifeMin (0.35s) it is a no-op.
+  minTrailLifetime?: number;
   // Emission density multiplier: 1 = the ported game behavior (default).
   // Scaled views pass the world→pixel scale so particle counts and trail
   // sampling stay as dense on screen as they are at one cell = one pixel.

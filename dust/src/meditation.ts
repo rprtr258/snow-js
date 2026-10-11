@@ -11,7 +11,9 @@ const canvas = $<HTMLCanvasElement>("canvas");
 const context = canvas.getContext("2d", { alpha: false });
 if (!context) throw new Error("Canvas 2D is unavailable in this browser.");
 const options: RawOptions = { core: true, glow: false, color: null, background: null };
-const replay: SimulationOptions = { worldSeed: 0, x: 0, y: 0, startFrame: 0, effect: "meditation", mathTrailScale: 3 };
+// minTrailLifetime: every particle lives at least 500ms (the native trail
+// lifeMin is 0.35s, which lets dots blink out sooner).
+const replay: SimulationOptions = { worldSeed: 0, x: 0, y: 0, startFrame: 0, effect: "meditation", mathTrailScale: 3, minTrailLifetime: 5.5 };
 
 type Layout = {width: number; height: number; scale: number};
 type WorkerMessage = {
