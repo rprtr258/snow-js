@@ -1,13 +1,14 @@
 // Fullscreen page (`meditation.html`): the meditation cube portal alone, on a
 // canvas that fills the viewport - no controls, no status, nothing else.
 // Frames stay on the shared worker so sizing, resizing and fullscreen never
-// wait for the software rasterizer.
+// wait for the software rasterizer. Pressing D toggles a hidden debug overlay.
 import { fullscreenView } from "./render-resolution";
 import { loadRasterModule } from "./wasm-raster";
 import { Catalog, RawOptions, SimulationOptions } from "./types";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = $<HTMLCanvasElement>("canvas");
+const debug = $<HTMLPreElement>("debug");
 const context = canvas.getContext("2d", { alpha: false });
 if (!context) throw new Error("Canvas 2D is unavailable in this browser.");
 const options: RawOptions = { core: true, glow: false, color: null, background: null, portalSprite: false };
@@ -26,6 +27,7 @@ type WorkerMessage = {
   message?: string;
   pixels?: ArrayBuffer;
   revision?: number;
+  stats?: { particles: number };
 };
 let view: Layout | null = null;
 let catalog: Catalog | null = null;
@@ -36,6 +38,8 @@ let recycled: ArrayBufferLike | null = null;
 let lastTime: number | null = null;
 let ready = false;
 let busy = true;
+let fps = 0;
+let particles = 0;
 
 const worker = new Worker(new URL("./render-worker.js", import.meta.url), {
   type: "module",
@@ -113,14 +117,30 @@ function receive(data: WorkerMessage) {
       );
     recycled = data.pixels;
   }
+  if (data.stats) particles = data.stats.particles;
   if (data.revision !== revision) return;
   ready = true;
   busy = false;
 }
+function renderDebug() {
+  if (!view) {
+    debug.textContent = "starting…";
+    return;
+  }
+  debug.textContent = [
+    `buffer ${view.width}×${view.height} @ scale ${view.scale.toFixed(1)} (dpr ${devicePixelRatio})`,
+    `fps ${fps.toFixed(1)} · particles ${particles} · revision ${revision} · ${
+      busy ? "busy" : ready ? "ready" : "down"
+    }`,
+    `effect ${replay.effect} · seed ${replay.worldSeed} · density ${(replay.density ?? 0).toFixed(1)}`,
+  ].join("\n");
+}
 function loop(now: number) {
+  if (!debug.hidden) renderDebug();
   if (ready && !busy && !document.hidden) {
     const elapsed = lastTime === null ? 0 : now - lastTime;
     lastTime = now;
+    if (elapsed > 0) fps = 1000 / elapsed;
     busy = true;
     const recycle = recycled;
     recycled = null;
@@ -162,6 +182,12 @@ async function start() {
   });
   document.addEventListener("visibilitychange", () => {
     lastTime = null;
+  });
+  addEventListener("keydown", (event: KeyboardEvent) => {
+    if (event.key.toLowerCase() !== "d" || event.ctrlKey || event.metaKey || event.altKey)
+      return;
+    debug.hidden = !debug.hidden;
+    if (!debug.hidden) renderDebug();
   });
   init();
   requestAnimationFrame(loop);
