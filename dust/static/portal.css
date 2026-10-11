@@ -1,0 +1,23 @@
+/* Page layout; menus and controls use ui-theme.css + Bootstrap. */
+html, body.dust-page { height: 100%; margin: 0; }
+body.dust-page { height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+.dust-workspace { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 21rem; gap: 1rem; padding: 1rem; }
+.dust-workspace > .preview, .dust-workspace > .grid-preview { grid-column: 1; grid-row: 1; min-width: 0; min-height: 0; overflow-y: auto; }
+.columns { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+.viewport { background: #000; border: 1px solid var(--border); border-radius: var(--radius-panel); overflow: auto; height: min(642px, 70dvh); min-height: 160px; display: flex; overflow-anchor: none; overscroll-behavior: contain; }
+.viewport canvas { flex: none; margin: auto; }
+canvas { display: block; margin-inline: auto; max-width: none; image-rendering: pixelated; }
+#stats { display: block; padding: .5rem 0; }
+#status { margin: 0; }
+#eye-note { color: var(--warning-fg); font-size: .75rem; }
+#math-trail-help { color: var(--text-muted); font-size: .75rem; margin: .375rem 0; }
+#math-trail-value, #zoom-value { color: var(--accent-fg); }
+#math-trail, #zoom { width: 100%; }
+#color-controls .source { margin: 0 0 .5rem; }
+#fullscreen-target:fullscreen { display: flex; flex-direction: column; width: 100vw; height: 100dvh; padding: .75rem; background: var(--bg); overflow: hidden; }
+#fullscreen-target:fullscreen .preview-toolbar { flex: 0 0 auto; }
+#fullscreen-target:fullscreen > .notice, #fullscreen-target:fullscreen > .render-details, #fullscreen-target:fullscreen > #eye-note { display: none; }
+#fullscreen-target:fullscreen .viewport, #fullscreen-target:fullscreen #grid-viewport { flex: 1 1 0; height: auto; min-height: 0; overflow: hidden; }
+#fullscreen-target:fullscreen .viewport canvas { width: 100% !important; height: 100% !important; object-fit: contain; }
+#fullscreen-target:fullscreen output, #fullscreen-target:fullscreen #status { flex: 0 0 auto; }
+@media (max-width: 991.98px) { .dust-workspace { grid-template-columns: minmax(0, 1fr); padding: .75rem; } .viewport { height: calc(100dvh - 9rem); } }
