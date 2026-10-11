@@ -31,7 +31,12 @@ scale changes.
 
 ## Verifying
 
-There is no test suite. Run `bun run typecheck` and `bun run build`.
+Run `bun test` — `src/render-snapshot.test.ts` renders the shared ViewerRuntime
+pipeline headlessly and pins the exact RGBA output of a frame per simulation
+family with bun snapshots (`src/__snapshots__/`). A rendering change that
+alters even one pixel fails; review the `.snap` diff and accept it with
+`bun test -u` only when the new image is intended. Also run
+`bun run typecheck` and `bun run build`.
 
 `bun run dev` watches `src/` and `static/`, rebuilds `dist/`, and reloads the
 browser — a manual build alongside it **races** the watcher, and browsers cache

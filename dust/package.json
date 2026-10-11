@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "bun run scripts/build.ts",
+    "test": "bun test",
     "typecheck": "tsc --noEmit && eslint .",
     "lint": "eslint .",
     "serve": "bun run scripts/serve.ts",
