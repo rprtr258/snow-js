@@ -313,6 +313,10 @@ export type SimulationOptions = {
   retainInvisible?: boolean;
   loopFrames?: number;
   mathTrailScale?: number;
+  // Emission density multiplier: 1 = the ported game behavior (default).
+  // Scaled views pass the world→pixel scale so particle counts and trail
+  // sampling stay as dense on screen as they are at one cell = one pixel.
+  density?: number;
   imageEmitter?: ImageEmitterOptions;
   imageOnce?: boolean;
   custom_image?: boolean;

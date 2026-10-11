@@ -524,6 +524,10 @@ export class PortalSimulation {
   declare loopFrames: number;
   declare time: number;
   declare initialTime: number;
+  // Emission density multiplier (SimulationOptions.density). 1 = the ported
+  // game behavior; scaled views pass their world→pixel scale so on-screen
+  // particle density matches one cell = one pixel.
+  declare density: number;
   // Optional surface of specialized simulations; the base class leaves them
   // unset so polymorphic callers can probe which kind of body is running.
   declare definition?: {sprites?: SpriteSpec[]; lifetime?: number};
@@ -549,6 +553,7 @@ export class PortalSimulation {
     lifetimeSeed = 1,
     startTime = Math.fround(startFrame / 60),
     retainInvisible = true,
+    density = this.density ?? 1,
   }: SimulationOptions = {}) {
     if (!Object.prototype.hasOwnProperty.call(EFFECTS, effect))
       throw new RangeError("Unknown portal effect");
@@ -561,6 +566,7 @@ export class PortalSimulation {
         emissionSeed,
         lifetimeSeed,
         startTime,
+        density,
       ].every(Number.isFinite) ||
       !Number.isSafeInteger(startFrame) ||
       startFrame < 0 ||
@@ -575,7 +581,8 @@ export class PortalSimulation {
       emissionSeed > 0xffffffff ||
       !Number.isInteger(lifetimeSeed) ||
       lifetimeSeed < 1 ||
-      lifetimeSeed >= 2147483647
+      lifetimeSeed >= 2147483647 ||
+      density <= 0
     ) {
       throw new RangeError("Invalid replay state");
     }
@@ -591,6 +598,7 @@ export class PortalSimulation {
       elapsedFrames: 0,
       dropped: 0,
       totalEmitted: 0,
+      density,
     });
     this.retainInvisible = retainInvisible;
     this.emissionRng = new EmissionRandom(emissionSeed);
@@ -622,7 +630,9 @@ export class PortalSimulation {
     }
     // Trail pixel de-duplication occurs AFTER offset/chance RNG and BEFORE velocity RNG.
     if (previous) {
-      const cell = `${roundedCell(x)},${roundedCell(y)}`;
+      // De-dup runs on density-scaled cells: sub-cell trail steps (density > 1)
+      // must not collapse onto one world cell, or scaled views lose the trail.
+      const cell = `${roundedCell(x * this.density)},${roundedCell(y * this.density)}`;
       if (cell === previous.cell)
         return;
       previous.cell = cell;
@@ -669,13 +679,18 @@ export class PortalSimulation {
   emitBatch(config: EmissionConfig, x: number, y: number, angle = 0) {
     this.emissionRng.range(0, 0);
     this.emissionRng.range(0, 0); // per-batch offsets
-    for (let i = 0; i < config.count; i++)
+    // Density keeps emitted counts proportional to the view scale; at the
+    // default 1 this is exactly config.count (count is an integer).
+    const count = Math.ceil(config.count * this.density);
+    for (let i = 0; i < count; i++)
       this.emit(config, x, y, angle);
   }
   emitTrail(previous: TrailPoint, current: V2, config: EmissionConfig = trail) {
     const dx = current.x - previous.x;
     const dy = current.y - previous.y;
-    const count = Math.ceil(Math.sqrt(dx * dx + dy * dy));
+    // Density subdivides the path so trail dots stay ~1 screen px apart when a
+    // world cell spans several pixels (elsewhere they read as dashed lines).
+    const count = Math.ceil(Math.sqrt(dx * dx + dy * dy) * this.density);
     this.emissionRng.range(0, 0);
     this.emissionRng.range(0, 0); // batch setup runs even at count=0
     if (count === 0)

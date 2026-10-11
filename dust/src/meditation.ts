@@ -10,8 +10,8 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 const canvas = $<HTMLCanvasElement>("canvas");
 const context = canvas.getContext("2d", { alpha: false });
 if (!context) throw new Error("Canvas 2D is unavailable in this browser.");
-const options: RawOptions = { core: true, glow: true, color: null, background: null };
-const replay: SimulationOptions = { worldSeed: 0, x: 0, y: 0, startFrame: 0, effect: "meditation" };
+const options: RawOptions = { core: true, glow: false, color: null, background: null };
+const replay: SimulationOptions = { worldSeed: 0, x: 0, y: 0, startFrame: 0, effect: "meditation", mathTrailScale: 3 };
 
 type Layout = {width: number; height: number; scale: number};
 type WorkerMessage = {
@@ -45,9 +45,10 @@ worker.onerror = (event) => {
 // continuously.
 function layout() {
   // The canvas is the display (CSS 100% × 100%), so its own client box is the
-  // resolution to render at: the buffer is the screen's own device resolution
-  // and the world→pixel scale is an exact float (fullscreenView), so one render
-  // cell is one screen pixel and the portal spans half the lower dimension.
+  // resolution to render at: the buffer is the screen's device resolution and
+  // the world→pixel scale sizes the portal to half the lower device dimension
+  // (fullscreenView in src/render-resolution.ts); positions and textures
+  // scale with it while dynamic primitives stay pixel-fine.
   view = fullscreenView(canvas.clientWidth, canvas.clientHeight, devicePixelRatio);
   canvas.width = view!.width;
   canvas.height = view!.height;
@@ -62,6 +63,11 @@ function init() {
   lastTime = null;
   busy = true;
   layout();
+  // Emission density tracks the world→pixel scale, so particle counts and
+  // trail sampling keep the on-screen density of one cell = one pixel
+  // (a world cell is several device px here; unscaled emission would read
+  // as sparse dots and dashed lines).
+  replay.density = view!.scale*2;
   // The worker owns the buffer it is handed, so send a copy of the asset.
   const buffer = bytes!.slice(0);
   worker.postMessage(

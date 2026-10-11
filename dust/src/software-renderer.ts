@@ -1,6 +1,6 @@
 // Full-resolution, deterministic rasterizer. No WebGL, canvas calls, random draws,
 // particle thinning, frame interpolation, or reduced-resolution glow here.
-import { writeParticleVertices, PortalSimulation } from "./portal-physics";
+import { writeParticleVertices, particleQuad, PortalSimulation } from "./portal-physics";
 import { GlowTap, RasterTexture, WasmRaster } from "./wasm-raster";
 import { glowDitherField, GLOW_DITHER_TILE } from "./glow-dither";
 import {
@@ -588,6 +588,53 @@ export class SoftwareRenderer {
       }
   }
 
+  // drawLong particles: the spec's stroke quad (particleQuad, portal-physics.ts)
+  // with only its position and length scaled by this.scale; thickness stays a
+  // 1px screen-space edge (device-px stroke at any S). The world-space corners
+  // keep the spec's fround pattern (writeParticleVertices), so at S = 1 the
+  // raster is bit-identical to the all-scaled path.
+  private longStrokeVertices(p: Particle, ox: number, oy: number, out: Float32Array) {
+    const q = particleQuad(p);
+    const s = this.scale,
+      c = q.cosine,
+      sn = q.sine,
+      r = q.length,
+      b = 1;
+    // Spec corner arithmetic (writeParticleVertices with l = 0, t = 0) in
+    // world space; the anchor and length edge are then scaled, the thickness
+    // edge is not, so the stroke stays 1 device px at any S.
+    const bx = Math.fround(q.x + Math.fround(c * r)),
+      by = Math.fround(q.y + Math.fround(sn * r));
+    const cx = Math.fround(q.x + Math.fround(Math.fround(c * r) - Math.fround(sn * b))),
+      cy = Math.fround(q.y + Math.fround(Math.fround(sn * r) + Math.fround(c * b)));
+    const dx = Math.fround(q.x - Math.fround(sn * b)),
+      dy = Math.fround(q.y + Math.fround(c * b));
+    if (s === 1) {
+      // Game-native scale: mirror the spec path's arithmetic exactly, so the
+      // raster is bit-identical to the all-scaled writeParticleVertices path.
+      out[0] = q.x + ox;
+      out[1] = q.y + oy;
+      out[2] = bx + ox;
+      out[3] = by + oy;
+      out[4] = cx + ox;
+      out[5] = cy + oy;
+      out[6] = dx + ox;
+      out[7] = dy + oy;
+    } else {
+      const ax = q.x * s + ox,
+        ay = q.y * s + oy;
+      out[0] = ax;
+      out[1] = ay;
+      out[2] = bx * s + ox;
+      out[3] = by * s + oy;
+      out[4] = out[2] + (cx - bx); // thickness edge: 1 screen px, never scaled
+      out[5] = out[3] + (cy - by);
+      out[6] = ax + (dx - q.x);
+      out[7] = ay + (dy - q.y);
+    }
+    return q.alpha;
+  }
+
   drawParticle(p: Particle, ox: number, oy: number, buildGlow: boolean) {
     const color = this.colorOverride ?? p.color ?? PURPLE;
     if (!p.drawLong) {
@@ -600,7 +647,7 @@ export class SoftwareRenderer {
         const s = this.scale,
           x = ((p.onGrid === false ? p.x : roundCell(f(p.x + 0.5))) - width) * s + ox,
           y = ((p.onGrid === false ? p.y : roundCell(f(p.y + 0.5))) - 1) * s + oy;
-        this.bodyRect(x, y, width * s, s, color, alpha);
+        this.bodyRect(x, y, width, 1, color, alpha);
       }
       if (buildGlow && p.glow !== false) {
         const a = f(p.alpha * (p.life < 1 ? p.life : 1));
@@ -636,11 +683,7 @@ export class SoftwareRenderer {
     } else {
       const vertices = this.corners,
         s = this.scale;
-      let alpha = writeParticleVertices(p, false, vertices);
-      for (let i = 0; i < 8; i += 2) {
-        vertices[i] = vertices[i] * s + ox;
-        vertices[i + 1] = vertices[i + 1] * s + oy;
-      }
+      let alpha = this.longStrokeVertices(p, ox, oy, vertices);
       this.rasterQuad(vertices, color, alpha);
       if (buildGlow && p.glow !== false) {
         alpha = writeParticleVertices(p, true, vertices);
@@ -742,7 +785,11 @@ export class SoftwareRenderer {
       this.scene[i + 2] = bg[2];
       this.scene[i + 3] = 255;
     }
-    if (advance) this.source.fill(0);
+    // The history buffer feeds only the glow composition (wasm composite's
+    // glow flag, or the JS branches below, which read `history` only when
+    // `glow` is set). With glow off the whole temporal-glow pipeline is dead
+    // work, so skip it — output is byte-identical.
+    if (advance && glow) this.source.fill(0);
     const scale = this.scale,
       ox = this.width / 2 - (sim.x + (this.centerX ?? 0)) * scale,
       oy = this.height / 2 - (sim.y + (this.centerY ?? 0)) * scale;
@@ -755,7 +802,7 @@ export class SoftwareRenderer {
         y = p.y * scale + oy;
       if (x < -margin || x > this.width + margin || y < -margin || y > this.height + margin)
         continue;
-      this.drawParticle(p, ox, oy, advance);
+      this.drawParticle(p, ox, oy, advance && glow);
     }
     if (core) {
       // Original figures have a steady, faint contour even while paused. This
@@ -791,7 +838,7 @@ export class SoftwareRenderer {
     }
     for (const p of sim.spriteParticles ?? [])
       if (p.delay <= 0 && p.elapsed >= 0 && !p.sprite.emissive) this.drawSprite(p.sprite, sim, p);
-    if (advance) {
+    if (advance && glow) {
       this.flushGlow();
       if (this.native) this.native.blur();
       else {
