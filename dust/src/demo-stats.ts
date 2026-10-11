@@ -1,6 +1,7 @@
 import { Asset } from "./types";
+import { FRAME_MS } from "./timing";
 
-export const FRAME_BUDGET = 1000 / 60;
+export const FRAME_BUDGET = FRAME_MS;
 export const STATS_INTERVAL = 250;
 
 type MemoryViewer = {

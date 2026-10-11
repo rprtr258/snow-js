@@ -20,8 +20,7 @@ import {
   TILE_WIDTH,
   TILE_HEIGHT,
 } from "./grid-layout";
-
-const FRAME_MS = 1000 / 60;
+import { FRAME_MS } from "./timing";
 export type GridEntry = {
   simulation: PortalSimulation;
   imageReplay: ImageReplay | null;

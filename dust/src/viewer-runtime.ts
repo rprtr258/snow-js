@@ -4,6 +4,7 @@ import { SoftwareRenderer } from "./software-renderer";
 import { packColor, validateColor } from "./particle-color";
 import { imageReplay, ImageReplay } from "./image-replay";
 import { PortalSimulation, TrailScalableSimulation, ImageSettableSimulation } from "./portal-physics";
+import { FRAME_MS } from "./timing";
 import {
   Catalog,
   NormalizedOptions,
@@ -12,7 +13,6 @@ import {
   SimulationOptions,
   ViewerFrameRequest,
 } from "./types";
-const FRAME_MS = 1000 / 60;
 // Presentation-only settings: hex strings in, packed colors out to the renderer.
 export function normalizeOptions(options: RawOptions): NormalizedOptions {
   return {

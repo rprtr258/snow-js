@@ -6,6 +6,7 @@ import { prepareContinuous } from "./gif-loop";
 import { GridLayout } from "./grid-layout";
 import { ShiftData } from "./material-shifts";
 import { PortalSimulation } from "./portal-physics";
+import { FRAME_MS } from "./timing";
 import {
   Catalog,
   RawOptions,
@@ -203,7 +204,7 @@ export class GifScene {
     while (this.ticks < target) {
       const recycle = this.result?.pixels?.buffer;
       this.result = this.config.kind === "demo"
-        ? this.runtime.frame({ ...this.settings, ...(warming ? { detail: 1 } : {}), elapsed: 1000 / 60, recycle })
+        ? this.runtime.frame({ ...this.settings, ...(warming ? { detail: 1 } : {}), elapsed: FRAME_MS, recycle })
         : this.runtime.frame({ ...this.settings, ...(warming ? { renderScale: 1 } : {}), step: true, recycle });
       this.ticks++;
     }

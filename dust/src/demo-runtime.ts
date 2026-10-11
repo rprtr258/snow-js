@@ -5,10 +5,10 @@ import { EmissionRandom, PortalSimulation, MAX_PARTICLES } from "./portal-physic
 import { COLOR_MODES, grayColor, figureColor, DemoSettings } from "./demo-settings";
 import { bufferMemory } from "./demo-stats";
 import { validateColor } from "./particle-color";
+import { FRAME_MS } from "./timing";
 import { Catalog, RawOptions, Resources, Size } from "./types";
 
 export const DEMO = Object.freeze({ width: 480, height: 320, build: 90, animate: 300, fade: 90, historyLimit: 128 });
-const FRAME_MS = 1000 / 60;
 export type FigureBounds = {x: number; y: number; width: number; height: number};
 export type DemoView_ = {
   width: number;

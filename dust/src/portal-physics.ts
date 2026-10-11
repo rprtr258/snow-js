@@ -1,6 +1,7 @@
 // Build-specific, isolated cosmetic-particle reconstruction. See docs/portal-research.md.
 // No terrain, external forces, camera culling, or other entities' shared RNG calls.
 import { loopAngle } from "./loop-motion";
+import { FRAME_MS } from "./timing";
 import {
   Catalog,
   EmissionConfig,
@@ -796,9 +797,9 @@ export class FixedStepClock {
     }
     this.pending += milliseconds * speed;
     let count = 0;
-    while (this.pending + 1e-8 >= 1000 / 60 && count < maxSteps) {
+    while (this.pending + 1e-8 >= FRAME_MS && count < maxSteps) {
       step();
-      this.pending -= 1000 / 60;
+      this.pending -= FRAME_MS;
       count++;
     }
     if (Math.abs(this.pending) < 1e-8) this.pending = 0;
