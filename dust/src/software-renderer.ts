@@ -15,6 +15,9 @@ const f = (x: number) => x;
 const PURPLE = 0x44b43cff;
 const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
 const roundCell = (x: number) => Math.floor(x + (x >= 0 ? 0.5 : -0.5));
+// The u32 scene clear (render, background fast path) packs RGBA bytes in
+// little-endian order; true on every wasm32/JS platform in practice.
+const LITTLE_ENDIAN = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1;
 // Native 0x00dd8450 allocates GL_RGBA / GL_UNSIGNED_BYTE render targets.
 // Keep these quantization boundaries: source blends, horizontal pass, history.
 export function byteRound(value: number) {
@@ -170,6 +173,7 @@ export class SoftwareRenderer {
   declare monochromeTextures: Map<RasterTexture, RasterTexture>;
   declare ditherTile: Float32Array;
   declare scene: Uint8ClampedArray;
+  declare scene32: Uint32Array | undefined;
   declare source: Float32Array;
   declare history: Float32Array;
   declare horizontal: Float32Array;
@@ -781,11 +785,29 @@ export class SoftwareRenderer {
     this.colorOverride = color;
     this.setMonochrome(monochrome);
     const bg = rgb(background);
-    for (let i = 0; i < this.scene.length; i += 4) {
-      this.scene[i] = bg[0];
-      this.scene[i + 1] = bg[1];
-      this.scene[i + 2] = bg[2];
-      this.scene[i + 3] = 255;
+    if (LITTLE_ENDIAN && bg[0] === 0 && bg[1] === 0 && bg[2] === 0) {
+      // Single memset as 0xff000000 u32s: black RGB with alpha 255. Scene
+      // alpha must stay 255 every frame — the glow=false identity path copies
+      // scene bytes straight into the output buffer, and putImageData
+      // surfaces the alpha plane even on alpha:false canvases (an output
+      // alpha of 0 composites as transparent, and browsers that unpremultiply
+      // on read turn it into white). Neither bodyRect nor quad rasterization
+      // writes the alpha byte, so it survives the frame untouched.
+      if (this.scene32 && this.scene32.buffer === this.scene.buffer)
+        this.scene32.fill(0xff000000);
+      else
+        this.scene32 = new Uint32Array(
+          this.scene.buffer,
+          this.scene.byteOffset,
+          this.scene.length / 4,
+        ).fill(0xff000000);
+    } else {
+      for (let i = 0; i < this.scene.length; i += 4) {
+        this.scene[i] = bg[0];
+        this.scene[i + 1] = bg[1];
+        this.scene[i + 2] = bg[2];
+        this.scene[i + 3] = 255;
+      }
     }
     // The history buffer feeds only the glow composition (wasm composite's
     // glow flag, or the JS branches below, which read `history` only when
@@ -874,7 +896,17 @@ export class SoftwareRenderer {
             );
           }
     }
-    if (this.native && !monochrome && !smoothGlow) {
+    // With glow, monochrome and dithering all off, the shipped compose kernel
+    // reduces to an RGB copy of the scene with alpha forced to 255 (verified
+    // byte-identical against raster.wasm). Skip it and copy the scene
+    // directly; the output alpha plane is ignored by the alpha:false display
+    // canvases. Emissive sprites below still draw into `output` afterwards,
+    // exactly as they did over the composed image.
+    const identityCompose = !glow && !monochrome && !smoothGlow;
+    if (identityCompose) {
+      this.output.set(this.scene);
+    }
+    else if (this.native && !monochrome && !smoothGlow) {
       this.native.compose(glow);
     }
     else {
@@ -914,7 +946,9 @@ export class SoftwareRenderer {
     for (const p of sim.spriteParticles ?? [])
       if (p.delay <= 0 && p.elapsed >= 0 && p.sprite.emissive) this.drawSprite(p.sprite, sim, p);
     this.afterGlow = false;
-    if (this.native) this.output.set(this.native.output);
+    // Only the compose path leaves the result in wasm memory; the identity
+    // and JS fallback paths already wrote `this.output`.
+    if (this.native && !identityCompose) this.output.set(this.native.output);
     return this.output;
   }
 }
