@@ -289,6 +289,10 @@ export class SoftwareRenderer {
     this.colorKernels.clear();
     this.activeKernel = null;
   }
+  // Reference rect blend. render()'s particle loop inlines this for the
+  // 1-2 px × 1 px particle bodies it draws at scale 1 (same ceil/clamp pixel
+  // selection and blend math, clamps skipped when provably interior); keep
+  // both pixel-exact if either changes.
   bodyRect(
     left: number,
     top: number,
@@ -641,70 +645,61 @@ export class SoftwareRenderer {
     return q.alpha;
   }
 
+  // Long-stroke (drawLong) particles only — 1-2 px × 1 px bodies are blended
+  // inline in render()'s particle loop (see bodyRect for the exact reference
+  // arithmetic those inlined paths must match).
   drawParticle(p: Particle, ox: number, oy: number, buildGlow: boolean) {
     const color = this.colorOverride ?? p.color ?? PURPLE;
-    if (!p.drawLong) {
-      const wide =
-          p.singleWidth === false &&
-          (p.cellType === "gas" || p.cellType === "fire"),
-        width = wide ? 2 : 1;
-      const alpha = Math.trunc(f(f(p.alpha * (wide ? 0.5 : 1)) * 255)) & 255;
-      if (alpha > 0) {
+    const vertices = this.corners,
+      s = this.scale;
+    let alpha = this.longStrokeVertices(p, ox, oy, vertices);
+    this.rasterQuad(vertices, color, alpha);
+    if (buildGlow && p.glow !== false) {
+      alpha = writeParticleVertices(p, true, vertices);
+      for (let i = 0; i < 8; i += 2) {
+        vertices[i] = vertices[i] * s + ox;
+        vertices[i + 1] = vertices[i + 1] * s + oy;
+      }
+      this.rasterQuad(
+        vertices,
+        color,
+        alpha,
+        this.glowTexture,
+        null,
+        true,
+        true,
+      );
+    }
+  }
+  // Glow stamp for 1-2 px particle bodies (drawLong === false), shared by the
+  // inlined body path in render()'s particle loop.
+  particleGlow(p: Particle, color: number, ox: number, oy: number) {
+    const a = f(p.alpha * (p.life < 1 ? p.life : 1));
+    const packed =
+      Math.trunc(f(f(f(a * f(0.03)) * (p.ultrabright ? 50 : 1)) * 255)) &
+      255;
+    if (packed > 0) {
+      if (p.onGrid === false) {
         const s = this.scale,
-          x = ((p.onGrid === false ? p.x : roundCell(f(p.x + 0.5))) - width) * s + ox,
-          y = ((p.onGrid === false ? p.y : roundCell(f(p.y + 0.5))) - 1) * s + oy;
-        this.bodyRect(x, y, width, 1, color, alpha);
-      }
-      if (buildGlow && p.glow !== false) {
-        const a = f(p.alpha * (p.life < 1 ? p.life : 1));
-        const packed =
-          Math.trunc(f(f(f(a * f(0.03)) * (p.ultrabright ? 50 : 1)) * 255)) &
-          255;
-        if (packed > 0) {
-          if (p.onGrid === false) {
-            const s = this.scale,
-              extent = 24 * s,
-              x = p.x * s - extent / 2 + ox,
-              y = p.y * s - extent / 2 + oy;
-            this.rasterQuad(
-              [x, y, x + extent, y, x + extent, y + extent, x, y + extent],
-              color,
-              packed / 255,
-              this.glowTexture,
-              null,
-              true,
-              true,
-            );
-          } else {
-            const s = this.scale;
-            this.addGlow(
-              (Math.trunc(f(p.x + 0.5)) - 12) * s + Math.ceil(ox - 0.5),
-              (Math.trunc(f(p.y + 0.5)) - 12) * s + Math.ceil(oy - 0.5),
-              color,
-              packed,
-            );
-          }
-        }
-      }
-    } else {
-      const vertices = this.corners,
-        s = this.scale;
-      let alpha = this.longStrokeVertices(p, ox, oy, vertices);
-      this.rasterQuad(vertices, color, alpha);
-      if (buildGlow && p.glow !== false) {
-        alpha = writeParticleVertices(p, true, vertices);
-        for (let i = 0; i < 8; i += 2) {
-          vertices[i] = vertices[i] * s + ox;
-          vertices[i + 1] = vertices[i + 1] * s + oy;
-        }
+          extent = 24 * s,
+          x = p.x * s - extent / 2 + ox,
+          y = p.y * s - extent / 2 + oy;
         this.rasterQuad(
-          vertices,
+          [x, y, x + extent, y, x + extent, y + extent, x, y + extent],
           color,
-          alpha,
+          packed / 255,
           this.glowTexture,
           null,
           true,
           true,
+        );
+      } else {
+        const s = this.scale;
+        this.addGlow(
+          (Math.trunc(f(p.x + 0.5)) - 12) * s + Math.ceil(ox - 0.5),
+          (Math.trunc(f(p.y + 0.5)) - 12) * s + Math.ceil(oy - 0.5),
+          color,
+          packed,
         );
       }
     }
@@ -818,15 +813,59 @@ export class SoftwareRenderer {
       ox = this.width / 2 - (sim.x + (this.centerX ?? 0)) * scale,
       oy = this.height / 2 - (sim.y + (this.centerY ?? 0)) * scale;
     this.kernelFor(ox, oy);
-    const margin = 40 * scale;
+    const margin = 40 * scale,
+      buildGlow = advance && glow,
+      sceneWidth = this.width,
+      sceneHeight = this.height,
+      scene = this.scene;
     for (let i = 0; i < sim.particles.length; i++) {
       const p = sim.particles[i];
       if (p.alpha <= 0) continue;
       const x = p.x * scale + ox,
         y = p.y * scale + oy;
-      if (x < -margin || x > this.width + margin || y < -margin || y > this.height + margin)
+      if (x < -margin || x > sceneWidth + margin || y < -margin || y > sceneHeight + margin)
         continue;
-      this.drawParticle(p, ox, oy, advance && glow);
+      if (p.drawLong) {
+        this.drawParticle(p, ox, oy, buildGlow);
+        continue;
+      }
+      // Lean 1-2 px × 1 px body blend, inlined from drawParticle → bodyRect
+      // (call overhead, the clamp dance and the per-call color decode
+      // dominated at ~33 ns/particle). Identical ceil/clamp pixel selection
+      // and blend arithmetic; clamps are skipped only for rects provably
+      // inside the scene, where they are the identity.
+      const color = this.colorOverride ?? p.color ?? PURPLE,
+        wide = p.singleWidth === false && (p.cellType === "gas" || p.cellType === "fire"),
+        width = wide ? 2 : 1,
+        alpha = Math.trunc(f(f(p.alpha * (wide ? 0.5 : 1)) * 255)) & 255;
+      if (alpha > 0) {
+        const bx = ((p.onGrid === false ? p.x : roundCell(f(p.x + 0.5))) - width) * scale + ox,
+          by = ((p.onGrid === false ? p.y : roundCell(f(p.y + 0.5))) - 1) * scale + oy,
+          a = alpha / 255,
+          inv = 1 - a,
+          c = rgb(color),
+          r = c[0] * a,
+          g = c[1] * a,
+          b = c[2] * a;
+        let x0 = Math.ceil(bx - 0.5),
+          x1 = Math.ceil(bx + width - 0.5),
+          y0 = Math.ceil(by - 0.5),
+          y1 = Math.ceil(by + 1 - 0.5);
+        if (x0 < 0 || x1 > sceneWidth || y0 < 0 || y1 > sceneHeight) {
+          x0 = clamp(x0, 0, sceneWidth);
+          x1 = clamp(x1, 0, sceneWidth);
+          y0 = clamp(y0, 0, sceneHeight);
+          y1 = clamp(y1, 0, sceneHeight);
+        }
+        for (let py = y0; py < y1; py++)
+          for (let px = x0; px < x1; px++) {
+            const i4 = (py * sceneWidth + px) * 4;
+            scene[i4] = r + scene[i4] * inv;
+            scene[i4 + 1] = g + scene[i4 + 1] * inv;
+            scene[i4 + 2] = b + scene[i4 + 2] * inv;
+          }
+      }
+      if (buildGlow && p.glow !== false) this.particleGlow(p, color, ox, oy);
     }
     if (core) {
       // Original figures have a steady, faint contour even while paused. This

@@ -316,6 +316,80 @@ export function stepParticle(p: Particle, time: number, dt = DT) {
   return p.life >= 0;
 }
 
+// Float64 twin of stepParticle for the opt-in fastParticles path
+// (SimulationOptions): same branch structure and field updates — including
+// the prevX/prevY stroke bookkeeping and the `life >= 0` return contract —
+// with every Math.fround dropped and the per-particle constant flags
+// (friction, attractor, airflowForce) read once instead of inside the
+// expression tree. The common portal profile (friction 0, no attractor,
+// airflow on — every particle the portal emitters produce) runs in one
+// specialized branch. Purely numeric: it calls no RNG and touches no
+// emission state, so RNG streams, emission counts and lifetimes are
+// identical to stepParticle; positions/velocities drift within the bounds
+// enforced by scripts/render-diff.ts. The fround stepParticle above stays
+// the byte-exact reference for every other consumer.
+export function stepParticleFast(p: Particle, time: number, dt = DT) {
+  p.age++;
+  const airflowForce = p.airflowForce,
+    friction = p.friction,
+    attractor = p.attractor ?? 0;
+  if (airflowForce > 0 && friction === 0 && attractor <= 0) {
+    // Common profile, one branch: friction 0, no attractor, airflow on.
+    const airflowScale = p.airflowScale;
+    const nx = p.x + p.vx * dt,
+      ny = p.y + p.vy * dt;
+    p.alpha = Math.min(1, Math.max(0, p.alpha + p.fadeRate * dt));
+    p.vx += p.gx * dt;
+    p.vy += p.gy * dt;
+    const angle = simplex3(nx * airflowScale, ny * airflowScale, time) * Math.PI;
+    p.vx -= Math.sin(angle) * airflowForce;
+    p.vy += Math.cos(angle) * airflowForce;
+    p.life -= dt;
+    const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy),
+      dx = p.x - nx,
+      dy = p.y - ny,
+      distance = Math.sqrt(dx * dx + dy * dy),
+      tx = distance > 0 ? dx / distance : 0,
+      ty = distance > 0 ? dy / distance : 0;
+    p.x = nx;
+    p.y = ny;
+    p.prevX = tx * speed * dt + nx;
+    p.prevY = ny + ty * speed * dt;
+    return p.life >= 0;
+  }
+  const nx = p.x + p.vx * dt,
+    ny = p.y + p.vy * dt;
+  p.alpha = Math.min(1, Math.max(0, p.alpha + p.fadeRate * dt));
+  if (attractor > 0) {
+    p.vx += ((p.targetX ?? 0) - p.x) * dt * attractor;
+    p.vy += ((p.targetY ?? 0) - p.y) * dt * attractor;
+  }
+  p.vx += p.gx * dt;
+  p.vy += p.gy * dt;
+  if (airflowForce > 0) {
+    const angle = simplex3(nx * p.airflowScale, ny * p.airflowScale, time) * Math.PI;
+    const s = Math.sin(angle);
+    p.vx -= s * airflowForce;
+    p.vy += Math.cos(angle) * airflowForce;
+  }
+  if (friction !== 0) {
+    p.vx -= p.vx * friction * dt;
+    p.vy -= p.vy * friction * dt;
+  }
+  p.life -= dt;
+  const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy),
+    dx = p.x - nx,
+    dy = p.y - ny,
+    distance = Math.sqrt(dx * dx + dy * dy),
+    tx = distance > 0 ? dx / distance : 0,
+    ty = distance > 0 ? dy / distance : 0;
+  p.x = nx;
+  p.y = ny;
+  p.prevX = tx * speed * dt + nx;
+  p.prevY = ny + ty * speed * dt;
+  return p.life >= 0;
+}
+
 // XML parameters, not fitted constants. airflow_time exists in XML but this
 // executable does not copy it to grid::Particle (0x00bc86e0).
 const ring = Object.freeze({
@@ -533,6 +607,9 @@ export class PortalSimulation {
   // Presentation-only opt-out (SimulationOptions.ambientRing) for the ambient
   // ring halo; default true keeps the ported emission.
   declare ambientRing: boolean;
+  // Opt-in float64 particle integration (SimulationOptions.fastParticles);
+  // default false keeps the byte-exact fround reference.
+  declare fastParticles: boolean;
   // Optional surface of specialized simulations; the base class leaves them
   // unset so polymorphic callers can probe which kind of body is running.
   declare definition?: {sprites?: SpriteSpec[]; lifetime?: number};
@@ -561,6 +638,7 @@ export class PortalSimulation {
     density = this.density ?? 1,
     minTrailLifetime = 0,
     ambientRing = true,
+    fastParticles = false,
   }: SimulationOptions = {}) {
     if (!Object.prototype.hasOwnProperty.call(EFFECTS, effect))
       throw new RangeError("Unknown portal effect");
@@ -608,6 +686,7 @@ export class PortalSimulation {
       totalEmitted: 0,
       density,
       ambientRing,
+      fastParticles,
     });
     // Authored presentation floor (meditation page); only ever lengthens the
     // native trail, never shortens it.
@@ -756,16 +835,28 @@ export class PortalSimulation {
   advanceParticles() {
     let write = 0,
       visible = 0;
-    for (const p of this.particles) {
+    const fast = this.fastParticles,
+      step = fast ? stepParticleFast : stepParticle,
+      particles = this.particles;
+    // Indexed compaction: survivors only self-store when the write cursor has
+    // lagged (write === read index is already in place).
+    for (let read = 0; read < particles.length; read++) {
+      const p = particles[read];
       if (!this.retainInvisible && p.alpha === 0 && p.fadeRate <= 0) {
         // In the isolated air model these particles can never become visible or influence another.
         // Keep age/lifetime/capacity and all RNG calls intact; skip only unobservable motion.
         p.age++;
-        p.life = Math.fround(p.life - DT);
-        if (p.life >= 0)
-          this.particles[write++] = p;
-      } else if (stepParticle(p, this.time)) {
-        this.particles[write++] = p;
+        // The fast path decrements in float64: the cull comparison may shift
+        // by an ulp-era frame, which the render-diff drift gates bound; the
+        // lifetime value itself (fixed at emission) is untouched.
+        p.life = fast ? p.life - DT : Math.fround(p.life - DT);
+        if (p.life >= 0) {
+          if (write !== read) particles[write] = p;
+          write++;
+        }
+      } else if (step(p, this.time)) {
+        if (write !== read) particles[write] = p;
+        write++;
         if (p.alpha > 0) visible++;
       }
     }

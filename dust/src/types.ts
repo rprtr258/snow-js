@@ -328,6 +328,12 @@ export type SimulationOptions = {
   // (the meditation page renders the cube and motes alone). Default true:
   // emitted, as in the game.
   ambientRing?: boolean;
+  // Opt-in float64 particle integration without Math.fround, with a
+  // specialized branch for the common portal profile. Defaults off: every
+  // consumer except the meditation page keeps the byte-exact fround
+  // reference. Numeric drift only, bounded by scripts/render-diff.ts gates;
+  // the RNG stream, emission counts and lifetimes are identical.
+  fastParticles?: boolean;
   imageEmitter?: ImageEmitterOptions;
   imageOnce?: boolean;
   custom_image?: boolean;
