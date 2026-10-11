@@ -1,7 +1,7 @@
 import { ViewerRuntime } from "./viewer-runtime";
 import { figureGroups, FigureDefinition } from "./grid-layout";
 import { figureSegments } from "./math-figures";
-import { EmissionRandom, PortalSimulation } from "./portal-physics";
+import { EmissionRandom, PortalSimulation, MAX_PARTICLES } from "./portal-physics";
 import { COLOR_MODES, grayColor, figureColor, DemoSettings } from "./demo-settings";
 import { bufferMemory } from "./demo-stats";
 import { validateColor } from "./particle-color";
@@ -140,7 +140,7 @@ export function addDemoDensity(sim: PortalSimulation, density: () => number, pix
       for (let i = 0; copies > 0 && i < count; i++) {
         const source = this.particles[start + i];
         for (let j = 0; j < copies; j++) {
-          if (this.particles.length >= 100000) { this.dropped++; continue; }
+          if (this.particles.length >= MAX_PARTICLES) { this.dropped++; continue; }
           const coarse = pixelated(), spread = coarse ? 1 : 0.45;
           let dx = random.range(-spread, spread), dy = random.range(-spread, spread);
           if (coarse) { dx = Math.round(dx); dy = Math.round(dy); }

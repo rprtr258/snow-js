@@ -5,6 +5,7 @@ import {
   DT,
   EmissionRandom,
   PORTAL_EMITTERS,
+  MAX_PARTICLES,
 } from "./portal-physics";
 import { stepSprite } from "./sprite-physics";
 import { MATH_EFFECTS, figureSegments } from "./math-figures";
@@ -162,7 +163,7 @@ export class SourceSimulation extends PortalSimulation {
     this.lifetimeRng.next();
     const life = this.lifetimeRng.float(c.lifeMin, c.lifeMax);
     this.lifetimeRng.integer(0, 100);
-    if (this.particles.length >= 100000) {
+    if (this.particles.length >= MAX_PARTICLES) {
       this.dropped++;
       return;
     }
@@ -411,7 +412,8 @@ export class MathSimulation extends PortalSimulation {
   }
   setTrailScale(value: number = MATH_TRAIL_SCALE.default) {
     const scale = validateMathTrailScale(value);
-    if (scale === this.mathTrailScale) return;
+    if (scale === this.mathTrailScale)
+      return;
     this.mathTrailScale = scale;
     this.trailEmission =
       scale === MATH_TRAIL_SCALE.default

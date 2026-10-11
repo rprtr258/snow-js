@@ -1,4 +1,4 @@
-import { PortalSimulation, DT } from "./portal-physics";
+import { PortalSimulation, DT, MAX_PARTICLES } from "./portal-physics";
 import { emissionPoints, imageSettings, validateMask, IMAGE_COLOR } from "./image-emitter";
 import {
   EmissionPoint,
@@ -43,7 +43,7 @@ export class ImageEmitterSimulation extends PortalSimulation {
         if (rng.unit() * 255 >= point.probability) continue;
         const x = f(this.x + point.x * c - point.y * sn), y = f(this.y + point.x * sn + point.y * c);
         const vx = f(rng.range(-s.drift, s.drift)), vy = f(rng.range(-s.drift, s.drift));
-        if (this.particles.length >= 100000) { this.dropped++; continue; }
+        if (this.particles.length >= MAX_PARTICLES) { this.dropped++; continue; }
         const life = f(s.lifetime);
         this.particles.push({ x, y, prevX: x, prevY: y, vx, vy, gx: 0, gy: f(s.gravity), friction: f(0.1),
           life, maxLife: life, age: 0, alpha: 1, fadeRate: f(-1 / life), airflowForce: f(s.turbulence), airflowScale: f(0.05),

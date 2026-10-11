@@ -22,6 +22,7 @@ import {
 export const DT = Math.fround(1 / 60);
 export const RNG_SCALE = 4.656612875e-10;
 export const BUILD = "17130612";
+export const MAX_PARTICLES = 1000000;
 export const SPARK = Object.freeze({
   r: Math.fround(180 / 255),
   g: Math.fround(60 / 255),
@@ -613,7 +614,7 @@ export class PortalSimulation {
     }));
   }
   emit(config: EmissionConfig, x: number, y: number, angle = 0, previous: TrailPoint | null = null) {
-    if (this.particles.length >= 100000) {
+    if (this.particles.length >= MAX_PARTICLES) {
       this.dropped++;
       return;
     }
