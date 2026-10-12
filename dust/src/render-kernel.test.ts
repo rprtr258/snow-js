@@ -71,6 +71,12 @@ test("wasm noise batch is bit-identical to JS simplex3", () => {
   const time2 = 0.0166 * 97;
   const out2 = kernel.noiseAngles(ax, ay, n, time2);
   expect(bits(out2)).toBe(bitsOf(ax.map((x, i) => simplex3(x, ay[i]!, time2))));
+  // Odd n exercises the scalar tail of the f64x2 pair walk; tiny n covers
+  // zero-pair edge cases (1, 3). Even n is covered by the full run above.
+  for (const m of [1, 3, n - 1]) {
+    const sub = kernel.noiseAngles(ax, ay, m, time);
+    expect(bits(sub)).toBe(bitsOf(ax.slice(0, m).map((x, i) => simplex3(x, ay[i]!, time))));
+  }
 });
 
 const bitScratch = new Float64Array(1);

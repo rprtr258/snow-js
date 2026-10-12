@@ -1363,45 +1363,631 @@
     f64.mul
   )
 
+  ;; cornerPair: portal-physics.ts's corner() for both f64x2 lanes at once.
+  ;; Same op order as $simplexCorner: t = ((0.6 - x²) - y²) - z²,
+  ;; t < 0 → 0, (g[1]*y + g[0]*x + g[2]*z) * t * t * t * t. $gA/$gB are the
+  ;; per-lane gradient row byte offsets ((index % 12) * 24); the gradient
+  ;; components are loaded scalar and splatted into lanes. Every arithmetic
+  ;; op is lane-wise IEEE f64, so lanes match the scalar results bitwise.
+  (func $cornerPair
+    (param $xv v128) (param $yv v128) (param $zv v128)
+    (param $gA i32) (param $gB i32) (result v128)
+    (local $t v128) (local $v v128)
+    (local $g1 v128) (local $g0 v128) (local $g2 v128)
+    ;; t
+    f64.const 0x1.3333333333333p-1
+    f64x2.splat
+    local.get $xv
+    local.get $xv
+    f64x2.mul
+    f64x2.sub
+    local.get $yv
+    local.get $yv
+    f64x2.mul
+    f64x2.sub
+    local.get $zv
+    local.get $zv
+    f64x2.mul
+    f64x2.sub
+    local.set $t
+    ;; gradient splats per lane: g[1] at row+8, g[0] at row+0, g[2] at row+16
+    v128.const i64x2 0 0
+    local.get $gA
+    f64.load offset=520
+    f64x2.replace_lane 0
+    local.get $gB
+    f64.load offset=520
+    f64x2.replace_lane 1
+    local.set $g1
+    v128.const i64x2 0 0
+    local.get $gA
+    f64.load offset=512
+    f64x2.replace_lane 0
+    local.get $gB
+    f64.load offset=512
+    f64x2.replace_lane 1
+    local.set $g0
+    v128.const i64x2 0 0
+    local.get $gA
+    f64.load offset=528
+    f64x2.replace_lane 0
+    local.get $gB
+    f64.load offset=528
+    f64x2.replace_lane 1
+    local.set $g2
+    ;; dot = (g[1]*y + g[0]*x) + g[2]*z
+    local.get $g1
+    local.get $yv
+    f64x2.mul
+    local.get $g0
+    local.get $xv
+    f64x2.mul
+    f64x2.add
+    local.get $g2
+    local.get $zv
+    f64x2.mul
+    f64x2.add
+    ;; ((dot*t)*t)*t)*t
+    local.get $t
+    f64x2.mul
+    local.get $t
+    f64x2.mul
+    local.get $t
+    f64x2.mul
+    local.get $t
+    f64x2.mul
+    local.set $v
+    ;; t < 0 → 0 (both lanes)
+    v128.const i64x2 0 0
+    local.get $v
+    local.get $t
+    v128.const i64x2 0 0
+    f64x2.lt
+    v128.bitselect
+  )
+
+  ;; simplexPair: $simplex for two adjacent particles (lane 0 = first,
+  ;; lane 1 = second), reading inputs from and writing the result to the
+  ;; host scratch. The scalar $simplex keeps the exact same operation order
+  ;; per lane; the ranking is the branchless mask form derived from the same
+  ;; JS branch table (checked row by row in the noise export comment above).
+  (func $simplexPair
+    (param $axPtr i32) (param $ayPtr i32) (param $outPtr i32) (param $time f64)
+    (local $xv v128) (local $yv v128) (local $zv v128)
+    (local $s v128) (local $i v128) (local $j v128) (local $k v128) (local $t v128)
+    (local $x0 v128) (local $y0 v128) (local $z0 v128)
+    (local $c1 v128) (local $c2 v128) (local $c3 v128)
+    (local $i1m v128) (local $j1m v128) (local $k1m v128)
+    (local $i2m v128) (local $j2m v128) (local $k2m v128)
+    (local $iiA i32) (local $iiB i32) (local $jjA i32) (local $jjB i32) (local $kkA i32) (local $kkB i32)
+    (local $gA i32) (local $gB i32)
+    (local $n0 v128) (local $n1 v128) (local $n2 v128) (local $n3 v128)
+    local.get $axPtr
+    v128.load
+    local.set $xv
+    local.get $ayPtr
+    v128.load
+    local.set $yv
+    local.get $time
+    f64x2.splat
+    local.set $zv
+    ;; s = (x + y + z) * (1/3)
+    local.get $xv
+    local.get $yv
+    f64x2.add
+    local.get $zv
+    f64x2.add
+    f64.const 0x1.5555555555555p-2
+    f64x2.splat
+    f64x2.mul
+    local.set $s
+    ;; i/j/k = floor(coord + s)
+    local.get $xv
+    local.get $s
+    f64x2.add
+    f64x2.floor
+    local.set $i
+    local.get $yv
+    local.get $s
+    f64x2.add
+    f64x2.floor
+    local.set $j
+    local.get $zv
+    local.get $s
+    f64x2.add
+    f64x2.floor
+    local.set $k
+    ;; t = (i + j + k) * (1/6)
+    local.get $i
+    local.get $j
+    f64x2.add
+    local.get $k
+    f64x2.add
+    f64.const 0x1.5555555555555p-3
+    f64x2.splat
+    f64x2.mul
+    local.set $t
+    ;; x0 = x - (i - t); y0, z0 likewise
+    local.get $xv
+    local.get $i
+    local.get $t
+    f64x2.sub
+    f64x2.sub
+    local.set $x0
+    local.get $yv
+    local.get $j
+    local.get $t
+    f64x2.sub
+    f64x2.sub
+    local.set $y0
+    local.get $zv
+    local.get $k
+    local.get $t
+    f64x2.sub
+    f64x2.sub
+    local.set $z0
+    ;; ranking masks: c1 = x0 >= y0, c2 = y0 >= z0, c3 = x0 >= z0
+    local.get $x0
+    local.get $y0
+    f64x2.ge
+    local.set $c1
+    local.get $y0
+    local.get $z0
+    f64x2.ge
+    local.set $c2
+    local.get $x0
+    local.get $z0
+    f64x2.ge
+    local.set $c3
+    local.get $c1
+    local.get $c2
+    local.get $c3
+    v128.or
+    v128.and
+    local.set $i1m
+    local.get $c1
+    v128.not
+    local.get $c2
+    v128.and
+    local.set $j1m
+    local.get $c2
+    v128.not
+    local.get $c1
+    v128.not
+    local.get $c3
+    v128.not
+    v128.or
+    v128.and
+    local.set $k1m
+    local.get $c1
+    local.get $c2
+    local.get $c3
+    v128.and
+    v128.or
+    local.set $i2m
+    local.get $c1
+    v128.not
+    local.get $c2
+    v128.or
+    local.set $j2m
+    local.get $c1
+    local.get $c2
+    v128.and
+    v128.not
+    local.get $c1
+    v128.not
+    local.get $c2
+    v128.and
+    local.get $c3
+    v128.and
+    v128.not
+    v128.and
+    local.set $k2m
+    ;; ii/jj/kk per lane: ToInt32(floor) & 255
+    local.get $i
+    f64x2.extract_lane 0
+    i32.trunc_sat_f64_s
+    i32.const 255
+    i32.and
+    local.set $iiA
+    local.get $i
+    f64x2.extract_lane 1
+    i32.trunc_sat_f64_s
+    i32.const 255
+    i32.and
+    local.set $iiB
+    local.get $j
+    f64x2.extract_lane 0
+    i32.trunc_sat_f64_s
+    i32.const 255
+    i32.and
+    local.set $jjA
+    local.get $j
+    f64x2.extract_lane 1
+    i32.trunc_sat_f64_s
+    i32.const 255
+    i32.and
+    local.set $jjB
+    local.get $k
+    f64x2.extract_lane 0
+    i32.trunc_sat_f64_s
+    i32.const 255
+    i32.and
+    local.set $kkA
+    local.get $k
+    f64x2.extract_lane 1
+    i32.trunc_sat_f64_s
+    i32.const 255
+    i32.and
+    local.set $kkB
+    ;; n0 = corner(x0, y0, z0, perm[ii + perm[jj + perm[kk]]])
+    local.get $kkA
+    i32.load8_u
+    local.get $jjA
+    i32.add
+    i32.load8_u
+    local.get $iiA
+    i32.add
+    i32.load8_u
+    i32.const 12
+    i32.rem_u
+    i32.const 24
+    i32.mul
+    local.set $gA
+    local.get $kkB
+    i32.load8_u
+    local.get $jjB
+    i32.add
+    i32.load8_u
+    local.get $iiB
+    i32.add
+    i32.load8_u
+    i32.const 12
+    i32.rem_u
+    i32.const 24
+    i32.mul
+    local.set $gB
+    local.get $x0
+    local.get $y0
+    local.get $z0
+    local.get $gA
+    local.get $gB
+    call $cornerPair
+    local.set $n0
+    ;; n1 = corner(x0 - i1 + 1/6, ..., perm[ii+i1 + perm[jj+j1 + perm[kk+k1]]])
+    local.get $x0
+    local.get $i1m
+    f64.const 1
+    f64x2.splat
+    v128.and
+    f64x2.sub
+    f64.const 0x1.5555555555555p-3
+    f64x2.splat
+    f64x2.add
+    local.get $y0
+    local.get $j1m
+    f64.const 1
+    f64x2.splat
+    v128.and
+    f64x2.sub
+    f64.const 0x1.5555555555555p-3
+    f64x2.splat
+    f64x2.add
+    local.get $z0
+    local.get $k1m
+    f64.const 1
+    f64x2.splat
+    v128.and
+    f64x2.sub
+    f64.const 0x1.5555555555555p-3
+    f64x2.splat
+    f64x2.add
+    local.get $kkA
+    local.get $k1m
+    i32x4.extract_lane 0
+    i32.const 1
+    i32.and
+    i32.add
+    i32.load8_u
+    local.get $jjA
+    local.get $j1m
+    i32x4.extract_lane 0
+    i32.const 1
+    i32.and
+    i32.add
+    i32.add
+    i32.load8_u
+    local.get $iiA
+    local.get $i1m
+    i32x4.extract_lane 0
+    i32.const 1
+    i32.and
+    i32.add
+    i32.add
+    i32.load8_u
+    i32.const 12
+    i32.rem_u
+    i32.const 24
+    i32.mul
+    local.set $gA
+    local.get $kkB
+    local.get $k1m
+    i32x4.extract_lane 2
+    i32.const 1
+    i32.and
+    i32.add
+    i32.load8_u
+    local.get $jjB
+    local.get $j1m
+    i32x4.extract_lane 2
+    i32.const 1
+    i32.and
+    i32.add
+    i32.add
+    i32.load8_u
+    local.get $iiB
+    local.get $i1m
+    i32x4.extract_lane 2
+    i32.const 1
+    i32.and
+    i32.add
+    i32.add
+    i32.load8_u
+    i32.const 12
+    i32.rem_u
+    i32.const 24
+    i32.mul
+    local.set $gB
+    local.get $gA
+    local.get $gB
+    call $cornerPair
+    local.set $n1
+    ;; n2 = corner(x0 - i2 + 1/3, ..., perm[ii+i2 + perm[jj+j2 + perm[kk+k2]]])
+    local.get $x0
+    local.get $i2m
+    f64.const 1
+    f64x2.splat
+    v128.and
+    f64x2.sub
+    f64.const 0x1.5555555555555p-2
+    f64x2.splat
+    f64x2.add
+    local.get $y0
+    local.get $j2m
+    f64.const 1
+    f64x2.splat
+    v128.and
+    f64x2.sub
+    f64.const 0x1.5555555555555p-2
+    f64x2.splat
+    f64x2.add
+    local.get $z0
+    local.get $k2m
+    f64.const 1
+    f64x2.splat
+    v128.and
+    f64x2.sub
+    f64.const 0x1.5555555555555p-2
+    f64x2.splat
+    f64x2.add
+    local.get $kkA
+    local.get $k2m
+    i32x4.extract_lane 0
+    i32.const 1
+    i32.and
+    i32.add
+    i32.load8_u
+    local.get $jjA
+    local.get $j2m
+    i32x4.extract_lane 0
+    i32.const 1
+    i32.and
+    i32.add
+    i32.add
+    i32.load8_u
+    local.get $iiA
+    local.get $i2m
+    i32x4.extract_lane 0
+    i32.const 1
+    i32.and
+    i32.add
+    i32.add
+    i32.load8_u
+    i32.const 12
+    i32.rem_u
+    i32.const 24
+    i32.mul
+    local.set $gA
+    local.get $kkB
+    local.get $k2m
+    i32x4.extract_lane 2
+    i32.const 1
+    i32.and
+    i32.add
+    i32.load8_u
+    local.get $jjB
+    local.get $j2m
+    i32x4.extract_lane 2
+    i32.const 1
+    i32.and
+    i32.add
+    i32.add
+    i32.load8_u
+    local.get $iiB
+    local.get $i2m
+    i32x4.extract_lane 2
+    i32.const 1
+    i32.and
+    i32.add
+    i32.add
+    i32.load8_u
+    i32.const 12
+    i32.rem_u
+    i32.const 24
+    i32.mul
+    local.set $gB
+    local.get $gA
+    local.get $gB
+    call $cornerPair
+    local.set $n2
+    ;; n3 = corner(x0 - 1 + 0.5, ..., perm[ii+1 + perm[jj+1 + perm[kk+1]]])
+    local.get $x0
+    f64.const 1
+    f64x2.splat
+    f64x2.sub
+    f64.const 0.5
+    f64x2.splat
+    f64x2.add
+    local.get $y0
+    f64.const 1
+    f64x2.splat
+    f64x2.sub
+    f64.const 0.5
+    f64x2.splat
+    f64x2.add
+    local.get $z0
+    f64.const 1
+    f64x2.splat
+    f64x2.sub
+    f64.const 0.5
+    f64x2.splat
+    f64x2.add
+    local.get $kkA
+    i32.const 1
+    i32.add
+    i32.load8_u
+    local.get $jjA
+    i32.const 1
+    i32.add
+    i32.add
+    i32.load8_u
+    local.get $iiA
+    i32.const 1
+    i32.add
+    i32.add
+    i32.load8_u
+    i32.const 12
+    i32.rem_u
+    i32.const 24
+    i32.mul
+    local.set $gA
+    local.get $kkB
+    i32.const 1
+    i32.add
+    i32.load8_u
+    local.get $jjB
+    i32.const 1
+    i32.add
+    i32.add
+    i32.load8_u
+    local.get $iiB
+    i32.const 1
+    i32.add
+    i32.add
+    i32.load8_u
+    i32.const 12
+    i32.rem_u
+    i32.const 24
+    i32.mul
+    local.set $gB
+    local.get $gA
+    local.get $gB
+    call $cornerPair
+    local.set $n3
+    ;; ((n1 + n0) + n2) + n3) * 32 → scratch
+    local.get $outPtr
+    local.get $n1
+    local.get $n0
+    f64x2.add
+    local.get $n2
+    f64x2.add
+    local.get $n3
+    f64x2.add
+    f64.const 32
+    f64x2.splat
+    f64x2.mul
+    v128.store
+  )
+
   ;; Batch entry: out[i] = simplex3(ax[i], ay[i], time) for i in [0, n).
   ;; ax/ay/out are host-managed scratch pointers after the tables (see
-  ;; RenderKernel.noiseAngles); the walk is sequential f64 loads/stores.
+  ;; RenderKernel.noiseAngles). Pairs of adjacent particles run through the
+  ;; f64x2 lane path ($simplexPair — every arithmetic op is lane-wise IEEE,
+  ;; so results are bit-identical to $simplex); an odd tail particle takes
+  ;; the scalar path. Per-lane data-dependent perm lookups stay scalar; the
+  ;; ranking is branchless from three f64x2 comparisons (c1 = x0>=y0,
+  ;; c2 = y0>=z0, c3 = x0>=z0): i1 = c1&(c2|c3), j1 = !c1&c2,
+  ;; k1 = !c2&(!c1|!c3), i2 = c1|(c2&c3), j2 = !c1|c2,
+  ;; k2 = !(c1&c2) & !(!c1&c2&c3) — each row checked against the JS branch
+  ;; table in portal-physics.ts. 0.0/1.0 flag values come from
+  ;; mask & splat(1.0) (all-ones & 1.0 bits = 1.0), i32 flags from
+  ;; extract_lane & 1.
   (func (export "noise")
     (param $axPtr i32) (param $ayPtr i32) (param $outPtr i32) (param $n i32) (param $time f64)
-    (local $i i32)
+    (local $p i32)
     block $done
-      loop $particles
-        local.get $i
+      loop $pairs
+        local.get $p
         local.get $n
+        i32.const 1
+        i32.shr_s
         i32.ge_s
         br_if $done
-        ;; store address first, then the value the call leaves on top
-        local.get $outPtr
-        local.get $i
-        i32.const 3
-        i32.shl
-        i32.add
         local.get $axPtr
-        local.get $i
-        i32.const 3
+        local.get $p
+        i32.const 4
         i32.shl
         i32.add
-        f64.load
         local.get $ayPtr
-        local.get $i
-        i32.const 3
+        local.get $p
+        i32.const 4
         i32.shl
         i32.add
-        f64.load
+        local.get $outPtr
+        local.get $p
+        i32.const 4
+        i32.shl
+        i32.add
         local.get $time
-        call $simplex
-        f64.store
-        local.get $i
+        call $simplexPair
+        local.get $p
         i32.const 1
         i32.add
-        local.set $i
-        br $particles
+        local.set $p
+        br $pairs
       end
+    end
+    ;; Odd tail: scalar evaluation of the last particle.
+    local.get $n
+    i32.const 1
+    i32.and
+    if
+      local.get $outPtr
+      local.get $n
+      i32.const 1
+      i32.sub
+      i32.const 3
+      i32.shl
+      i32.add
+      local.get $axPtr
+      local.get $n
+      i32.const 1
+      i32.sub
+      i32.const 3
+      i32.shl
+      i32.add
+      f64.load
+      local.get $ayPtr
+      local.get $n
+      i32.const 1
+      i32.sub
+      i32.const 3
+      i32.shl
+      i32.add
+      f64.load
+      local.get $time
+      call $simplex
+      f64.store
     end
   )
 )
