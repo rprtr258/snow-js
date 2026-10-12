@@ -11,6 +11,13 @@
 // scene copy in either direction. memory.grow preserves existing bytes, so a
 // grow to fit larger staging only detaches the JS views, which the renderer
 // rewraps; the scene contents survive.
+//
+// The same binary also exports `noise`: a bit-exact wasm port of
+// portal-physics's simplex3, run as one batch call per simulation step
+// (advanceParticles's fast path). It executes on a second instance with its
+// own memory — the blend instance's memory is the renderer's scene canvas,
+// and growing for noise scratch must never detach those views.
+import { SIMPLEX_PERMUTATION, SIMPLEX_GRADIENTS } from "./portal-physics";
 import { RENDER_KERNEL_WASM } from "./render-kernel-wasm";
 
 // Kernel meta word layout (see render-kernel.wat): bits 0-2 flags
@@ -40,6 +47,20 @@ type BlendExport = (
   sh: number,
 ) => number;
 
+type NoiseExport = (
+  axPtr: number,
+  ayPtr: number,
+  outPtr: number,
+  n: number,
+  time: number,
+) => void;
+
+// Noise-instance layout (must match render-kernel.wat's $simplexCorner
+// loads): doubled permutation (2 × 256 bytes) at 0, 12 gradients × 3 f64 at
+// 512, host scratch (ax | ay | out) after the tables.
+const NOISE_GRAD_BYTES = 512;
+const NOISE_TABLE_BYTES = 800;
+
 // Compiles the embedded kernel binary. Returns null where WebAssembly (or its
 // base64 decode) is unavailable; every caller must fall back to the JS blend.
 export function compileRenderKernel(): WebAssembly.Module | null {
@@ -57,11 +78,17 @@ export class RenderKernel {
   declare memory: WebAssembly.Memory;
   declare blend: BlendExport;
   declare capacity: number;
+  declare module: WebAssembly.Module;
+  declare noise: NoiseExport | null;
+  declare noiseMemory: WebAssembly.Memory | null;
   constructor(module: WebAssembly.Module) {
     this.memory = new WebAssembly.Memory({ initial: 4 });
+    this.module = module;
     const instance = new WebAssembly.Instance(module, { env: { mem: this.memory } });
     this.blend = instance.exports.blend as BlendExport;
     this.capacity = this.memory.buffer.byteLength;
+    this.noise = null;
+    this.noiseMemory = null;
   }
   // Grows the memory to fit the scene plus staging columns for n particles.
   // Returns true when the memory grew: existing typed-array views onto its
@@ -107,5 +134,45 @@ export class RenderKernel {
     const metaPtr = asPtr + (n + 1) * 8;
     new Uint32Array(buf, metaPtr, n).set(staging.meta.subarray(0, n));
     return this.blend(0, base, base + n * 8, asPtr, metaPtr, n, scale, ox, oy, margin, sw, sh);
+  }
+
+  // Batch-evaluates the simulation's airflow noise (portal-physics's
+  // simplex3): copies ax/ay into the noise instance's memory, runs the wasm
+  // port over all n inputs at one shared z (the sim's frame time), and
+  // returns a view of the raw f64 results in input order. Values are
+  // bit-identical to the JS simplex3 (src/render-kernel.test.ts fuzzes both
+  // this primitive and the full fast-path integration). The view is valid
+  // until the next noiseAngles call (the caller walks the pool immediately).
+  noiseAngles(ax: Float64Array, ay: Float64Array, n: number, time: number): Float64Array {
+    if (!this.noise) {
+      // Second instance of the same module with its own memory: the blend
+      // instance's memory is the scene canvas, grown and rewrapped by the
+      // renderer — noise scratch must not detach those views.
+      this.noiseMemory = new WebAssembly.Memory({ initial: 1 });
+      this.noise = (
+        new WebAssembly.Instance(this.module, { env: { mem: this.noiseMemory } })
+          .exports as { noise: NoiseExport }
+      ).noise;
+      // Tables are copied once; memory.grow preserves bytes, so later grows
+      // (for scratch) keep them intact.
+      const perm = new Uint8Array(512);
+      for (let i = 0; i < 512; i++) perm[i] = SIMPLEX_PERMUTATION[i & 255];
+      new Uint8Array(this.noiseMemory.buffer, 0, 512).set(perm);
+      new Float64Array(this.noiseMemory.buffer, NOISE_GRAD_BYTES, 36).set(
+        SIMPLEX_GRADIENTS.flat(),
+      );
+    }
+    const need = NOISE_TABLE_BYTES + n * 24;
+    if (this.noiseMemory!.buffer.byteLength < need)
+      this.noiseMemory!.grow(
+        Math.ceil((need - this.noiseMemory!.buffer.byteLength) / 65536),
+      );
+    const buf = this.noiseMemory!.buffer;
+    const outPtr = NOISE_TABLE_BYTES + n * 16;
+    // The scratch arrays are capacity-sized; copy only the live prefix.
+    new Float64Array(buf, NOISE_TABLE_BYTES, n).set(ax.subarray(0, n));
+    new Float64Array(buf, NOISE_TABLE_BYTES + n * 8, n).set(ay.subarray(0, n));
+    this.noise!(NOISE_TABLE_BYTES, NOISE_TABLE_BYTES + n * 8, outPtr, n, time);
+    return new Float64Array(buf, outPtr, n);
   }
 }

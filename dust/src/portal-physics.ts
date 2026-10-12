@@ -81,6 +81,9 @@ const gradients = [
   [0, 1, -1],
   [0, -1, -1],
 ];
+// Shared with render-kernel.ts: the wasm noise batch copies this table into
+// its own memory, so its simplex3 port reads exactly these values.
+export const SIMPLEX_GRADIENTS = gradients;
 function corner(x: number, y: number, z: number, index: number) {
   const t = 0.6 - x * x - y * y - z * z;
   if (t < 0) return 0;
@@ -347,7 +350,11 @@ for (let i = 0; i < SIN_LUT.length; i++)
 // identical to stepParticle; positions/velocities drift within the bounds
 // enforced by scripts/render-diff.ts. The fround stepParticle above stays
 // the byte-exact reference for every other consumer.
-export function stepParticleFast(p: Particle, time: number, dt = DT) {
+// `airflow` optionally carries the precomputed raw simplex3 value for this
+// particle (the wasm batch in advanceParticles evaluates the staged pool in
+// one call, from this same pre-step state — bit-identical to the inline
+// call); undefined evaluates the noise inline.
+export function stepParticleFast(p: Particle, time: number, dt = DT, airflow?: number) {
   p.age++;
   const airflowForce = p.airflowForce,
     friction = p.friction,
@@ -357,13 +364,14 @@ export function stepParticleFast(p: Particle, time: number, dt = DT) {
     const airflowScale = p.airflowScale;
     const nx = p.x + p.vx * dt,
       ny = p.y + p.vy * dt;
+    const angle =
+      (airflow ?? simplex3(nx * airflowScale, ny * airflowScale, time)) * Math.PI;
     // fadeRate 0 never changes alpha (emissions start inside [0,1]), so the
     // clamped rewrite is a no-op worth skipping on the hot path.
     if (p.fadeRate !== 0)
       p.alpha = Math.min(1, Math.max(0, p.alpha + p.fadeRate * dt));
     p.vx += p.gx * dt;
     p.vy += p.gy * dt;
-    const angle = simplex3(nx * airflowScale, ny * airflowScale, time) * Math.PI;
     const k = angle * SIN_LUT_TO_INDEX + SIN_LUT_BIAS;
     p.vx -= SIN_LUT[k & SIN_LUT_MASK] * airflowForce;
     p.vy += SIN_LUT[(k + SIN_LUT_QUARTER) & SIN_LUT_MASK] * airflowForce;
@@ -395,7 +403,8 @@ export function stepParticleFast(p: Particle, time: number, dt = DT) {
   p.vx += p.gx * dt;
   p.vy += p.gy * dt;
   if (airflowForce > 0) {
-    const angle = simplex3(nx * p.airflowScale, ny * p.airflowScale, time) * Math.PI;
+    const angle =
+      (airflow ?? simplex3(nx * p.airflowScale, ny * p.airflowScale, time)) * Math.PI;
     const s = Math.sin(angle);
     p.vx -= s * airflowForce;
     p.vy += Math.cos(angle) * airflowForce;
@@ -654,6 +663,21 @@ export class PortalSimulation {
   declare mirrorMeta: Uint32Array;
   declare mirrorN: number;
   declare mirrorDrawLong: number;
+  // Opt-in wasm airflow batch (ViewerRuntime.restart wires it when the render
+  // kernel module is loaded): evaluates the pool's simplex3 airflow noise in
+  // one call per advanceParticles, replacing one JS call per particle — the
+  // dominant per-step cost at fullscreen densities. Input columns are staged
+  // by stageMirror (see below); lanes past the staged prefix (particles
+  // emitted this frame) take the inline JS noise. Returns a view over kernel
+  // memory holding the raw f64 values in pool order, or null to keep the
+  // inline JS noise in stepParticleFast. Pure acceleration: the wasm port is
+  // bit-identical (src/render-kernel.test.ts pins the primitive and the full
+  // lockstep).
+  declare airflowBatch:
+    | ((ax: Float64Array, ay: Float64Array, n: number, time: number) => Float64Array)
+    | null;
+  declare noiseAx: Float64Array;
+  declare noiseAy: Float64Array;
   // Optional surface of specialized simulations; the base class leaves them
   // unset so polymorphic callers can probe which kind of body is running.
   declare definition?: {sprites?: SpriteSpec[]; lifetime?: number};
@@ -753,6 +777,9 @@ export class PortalSimulation {
     this.mirrorMeta = new Uint32Array(0);
     this.mirrorN = 0;
     this.mirrorDrawLong = 0;
+    this.airflowBatch = null;
+    this.noiseAx = new Float64Array(0);
+    this.noiseAy = new Float64Array(0);
     this.points = [];
     this.previousPoints = Array.from({ length: 8 }, () => ({
       x: this.x,
@@ -898,8 +925,22 @@ export class PortalSimulation {
     let write = 0,
       visible = 0;
     const fast = this.fastParticles,
-      step = fast ? stepParticleFast : stepParticle,
       particles = this.particles;
+    // The fast path evaluates the airflow noise for the staged pool in ONE
+    // call when a wasm batch is wired (the dominant per-step cost at
+    // fullscreen densities). stageMirror staged each survivor's noise input —
+    // (x + vx·DT)·scale from the post-advance state, exactly the pre-step
+    // state this loop's nx/ny would read — so the batch consumes flat columns
+    // with no separate pool scan. The staging prefix [0, mirrorN) maps 1:1
+    // onto this loop's `read` index: emissions only append past it, and
+    // compaction is stable. New particles (read ≥ mirrorN) and culled lanes
+    // (never stepped) take the inline JS noise / no noise at all.
+    let noise: Float64Array | null = null;
+    let stagedN = 0;
+    if (fast && this.airflowBatch && this.mirrorN > 0) {
+      stagedN = this.mirrorN;
+      noise = this.airflowBatch(this.noiseAx, this.noiseAy, stagedN, this.time);
+    }
     // Indexed compaction: survivors only self-store when the write cursor has
     // lagged (write === read index is already in place).
     for (let read = 0; read < particles.length; read++) {
@@ -922,7 +963,16 @@ export class PortalSimulation {
             write++;
           }
         }
-      } else if (step(p, this.time)) {
+      } else if (
+        fast
+          ? stepParticleFast(
+              p,
+              this.time,
+              DT,
+              noise !== null && read < stagedN ? noise[read] : undefined,
+            )
+          : stepParticle(p, this.time)
+      ) {
         if (write !== read) particles[write] = p;
         write++;
         if (p.alpha > 0) visible++;
@@ -943,6 +993,10 @@ export class PortalSimulation {
   // shifted so r sits at bits 24-31 — the kernel decodes r = (m >>> 24) & 255,
   // g = (m >>> 16) & 255, b = (m >>> 8) & 255, and SoftwareRenderer.rgb
   // decodes r = (packed >>> 16) & 255, so the shift maps one to the other.
+  // While here (fast path only) it also stages the NEXT step's airflow noise
+  // inputs: (x + vx·DT)·scale from this post-advance state is exactly the
+  // pre-step state the next advanceParticles would read, so the wasm noise
+  // batch needs no separate object-walking pass.
   stageMirror() {
     const particles = this.particles;
     const n = particles.length;
@@ -958,12 +1012,24 @@ export class PortalSimulation {
       as = this.mirrorAs = new Float64Array(cap);
       meta = this.mirrorMeta = new Uint32Array(cap);
     }
+    let ax = this.noiseAx,
+      ay = this.noiseAy;
+    if (this.fastParticles && ax.length < n) {
+      const cap = Math.max(n, ax.length * 2, 1024);
+      ax = this.noiseAx = new Float64Array(cap);
+      ay = this.noiseAy = new Float64Array(cap);
+    }
+    const stageNoise = this.fastParticles;
     let drawLong = 0;
     for (let i = 0; i < n; i++) {
       const p = particles[i]!;
       xs[i] = p.x;
       ys[i] = p.y;
       as[i] = p.alpha;
+      if (stageNoise) {
+        ax[i] = (p.x + p.vx * DT) * p.airflowScale;
+        ay[i] = (p.y + p.vy * DT) * p.airflowScale;
+      }
       // Meta inputs are immutable after emission except color/cellType
       // (material-shifts, which resets the cache); portal-family particles
       // arrive precomputed, others cache here on first staging.

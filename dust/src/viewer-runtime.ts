@@ -122,6 +122,17 @@ export class ViewerRuntime {
       this.resources,
     );
     this.setupSimulation(candidate);
+    // Batch the fast path's airflow noise through the wasm kernel when one is
+    // loaded (the meditation page): one wasm simplex3 call per step instead
+    // of one JS call per particle. Bit-identical to the inline JS noise
+    // (src/render-kernel.test.ts); without a kernel the sim keeps its inline
+    // noise. Closed over the current kernel instance: a setView() rebuild
+    // between restarts would only hand the sim an equivalent, stateless
+    // noise host.
+    const noiseKernel = this.renderer.renderKernel;
+    candidate.airflowBatch = noiseKernel
+      ? (ax, ay, n, time) => noiseKernel.noiseAngles(ax, ay, n, time)
+      : null;
     this.imageReplay = this.replayImages ? imageReplay(candidate) : null;
     this.replayInput = { ...replay };
     this.imageCycles = automatic ? this.imageCycles + 1 : 0;
@@ -200,6 +211,12 @@ export class ViewerRuntime {
     let pixels: Uint8ClampedArray | null = null,
       simulationMS = 0,
       rasterMS = 0;
+    // With glow off a render is a pure function of the simulation state (the
+    // temporal-glow history it would advance is never read) and only the last
+    // render's pixels are ever returned — intermediate renders are discarded
+    // work. Render once after the stepping loop instead of once per step: a
+    // slow rAF (steps = 2) then pays one render, not two.
+    const glow = this.options.glow;
     for (let i = 0; i < steps; i++) {
       let t = performance.now();
       if (this.imageReplay?.ready && this.allowImageReplay(this.imageReplay.cycleFrames))
@@ -207,15 +224,22 @@ export class ViewerRuntime {
       this.simulation.step();
       this.imageReplay?.afterStep();
       simulationMS += performance.now() - t;
-      t = performance.now();
-      pixels = this.renderer.render(this.simulation, renderOptions(this.options), true, i === 0 ? recycle : null);
-      rasterMS += performance.now() - t;
+      if (glow) {
+        t = performance.now();
+        pixels = this.renderer.render(this.simulation, renderOptions(this.options), true, i === 0 ? recycle : null);
+        rasterMS += performance.now() - t;
+      }
       if (!step) this.pending -= FRAME_MS;
+    }
+    if (steps && !glow) {
+      const t = performance.now();
+      pixels = this.renderer.render(this.simulation, renderOptions(this.options), true, recycle);
+      rasterMS = performance.now() - t;
     }
     if (!steps && redraw) {
       pixels = this.renderer.render(this.simulation, renderOptions(this.options), false, recycle);
     }
-    if (steps) this.cost = { simulation: simulationMS / steps, raster: rasterMS / steps };
+    if (steps) this.cost = { simulation: simulationMS / steps, raster: glow ? rasterMS / steps : rasterMS };
     this.lastSteps = steps;
     return { revision: this.revision, stats: this.stats(), pixels, steps };
   }

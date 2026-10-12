@@ -37,6 +37,13 @@ const harness = loadHarness();
 const view = fullscreenView(width, height, 1);
 const sim = buildSimulation(harness, meditationReplay(width, height, fast));
 const renderer = buildRenderer(harness, width, height, view.scale, kernel ? harness.renderKernelModule : null);
+// The page's runtime wires the wasm noise batch whenever the render kernel
+// module is loaded (ViewerRuntime.restart), so --kernel reproduces the page's
+// exact configuration: blend kernel in the renderer, batched airflow noise
+// in the sim's fast path.
+if (kernel && renderer.renderKernel)
+  sim.airflowBatch = (ax, ay, n, time) =>
+    renderer.renderKernel!.noiseAngles(ax, ay, n, time);
 
 for (let i = 0; i < warmup; i++) {
   sim.step();

@@ -71,11 +71,16 @@ function variant(spec: string): SimulationOptions {
 
 type Run = { sim: ReturnType<typeof buildSimulation>; renderer: ReturnType<typeof buildRenderer> };
 
+// The page's configuration: the render kernel module is loaded, so the
+// renderer blends through the wasm kernel and the runtime wires the wasm
+// noise batch into the sim's fast path (ViewerRuntime.restart). Inert for
+// the byte-exact reference variant (the batch only feeds fastParticles).
 function make(options: SimulationOptions): Run {
-  return {
-    sim: buildSimulation(harness, options),
-    renderer: buildRenderer(harness, width, height, view.scale),
-  };
+  const sim = buildSimulation(harness, options);
+  const renderer = buildRenderer(harness, width, height, view.scale, harness.renderKernelModule);
+  if (renderer.renderKernel)
+    sim.airflowBatch = (ax, ay, n, time) => renderer.renderKernel!.noiseAngles(ax, ay, n, time);
+  return { sim, renderer };
 }
 
 const harness = loadHarness();

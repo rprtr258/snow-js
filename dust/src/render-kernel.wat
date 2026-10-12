@@ -1016,4 +1016,392 @@
     local.get $m0
     f64.convert_i32_u
   )
+
+  ;; ------------------------------------------------------------------
+  ;; Airflow noise batch (portal-physics.ts's simplex3, bit-exact port).
+  ;; Feeds PortalSimulation.advanceParticles's fast path: one wasm call per
+  ;; step evaluates the whole pool's noise instead of one JS call per
+  ;; particle (the dominant sim cost at fullscreen densities). Operation
+  ;; order matches the JS reference exactly (left-associative chains, same
+  ;; literals), so results are bit-identical — enforced by
+  ;; src/render-kernel.test.ts. Table layout (copied in once by
+  ;; RenderKernel): doubled 256-byte permutation at 0, 12 gradients × 3 f64
+  ;; at 512. Lattice coords convert with i32.trunc_sat_f64_s: identical to
+  ;; JS ToInt32 for |i| < 2³¹ (particle positions keep lattice indices
+  ;; ≤ ~10³); beyond it JS wraps while wasm saturates — an unreachable
+  ;; domain, and the saturating form cannot trap.
+  (func $simplexCorner
+    (param $x f64) (param $y f64) (param $z f64) (param $index i32) (result f64)
+    (local $t f64) (local $g i32)
+    ;; t = 0.6 - x*x - y*y - z*z, left-associative: ((0.6 - x²) - y²) - z²
+    f64.const 0x1.3333333333333p-1
+    local.get $x
+    local.get $x
+    f64.mul
+    f64.sub
+    local.get $y
+    local.get $y
+    f64.mul
+    f64.sub
+    local.get $z
+    local.get $z
+    f64.mul
+    f64.sub
+    local.set $t
+    local.get $t
+    f64.const 0
+    f64.lt
+    if (result f64)
+      f64.const 0
+    else
+      local.get $index
+      i32.const 12
+      i32.rem_u
+      i32.const 24
+      i32.mul
+      local.set $g
+      ;; (g[1]*y + g[0]*x + g[2]*z) * t * t * t * t, left-associative.
+      local.get $g
+      f64.load offset=520
+      local.get $y
+      f64.mul
+      local.get $g
+      f64.load offset=512
+      local.get $x
+      f64.mul
+      f64.add
+      local.get $g
+      f64.load offset=528
+      local.get $z
+      f64.mul
+      f64.add
+      local.get $t
+      f64.mul
+      local.get $t
+      f64.mul
+      local.get $t
+      f64.mul
+      local.get $t
+      f64.mul
+    end
+  )
+
+  ;; simplex3(x, y, z) — exact port of portal-physics.ts's noise (the fround
+  ;; stepParticle path frounds its own inputs and is never fed these values).
+  (func $simplex
+    (param $x f64) (param $y f64) (param $z f64) (result f64)
+    (local $s f64) (local $i f64) (local $j f64) (local $k f64) (local $t f64)
+    (local $x0 f64) (local $y0 f64) (local $z0 f64)
+    (local $i1 i32) (local $j1 i32) (local $k1 i32)
+    (local $i2 i32) (local $j2 i32) (local $k2 i32)
+    (local $ii i32) (local $jj i32) (local $kk i32)
+    (local $n0 f64) (local $n1 f64) (local $n2 f64) (local $n3 f64)
+    ;; s = (x + y + z) * (1/3)
+    local.get $x
+    local.get $y
+    f64.add
+    local.get $z
+    f64.add
+    f64.const 0x1.5555555555555p-2
+    f64.mul
+    local.set $s
+    ;; i/j/k = Math.floor(coord + s)
+    local.get $x
+    local.get $s
+    f64.add
+    f64.floor
+    local.set $i
+    local.get $y
+    local.get $s
+    f64.add
+    f64.floor
+    local.set $j
+    local.get $z
+    local.get $s
+    f64.add
+    f64.floor
+    local.set $k
+    ;; t = (i + j + k) * (1/6)
+    local.get $i
+    local.get $j
+    f64.add
+    local.get $k
+    f64.add
+    f64.const 0x1.5555555555555p-3
+    f64.mul
+    local.set $t
+    ;; x0 = x - (i - t); y0, z0 likewise
+    local.get $x
+    local.get $i
+    local.get $t
+    f64.sub
+    f64.sub
+    local.set $x0
+    local.get $y
+    local.get $j
+    local.get $t
+    f64.sub
+    f64.sub
+    local.set $y0
+    local.get $z
+    local.get $k
+    local.get $t
+    f64.sub
+    f64.sub
+    local.set $z0
+    ;; Corner ranking (i1/j1/k1/i2/j2/k2 default 0).
+    local.get $x0
+    local.get $y0
+    f64.ge
+    if
+      local.get $y0
+      local.get $z0
+      f64.ge
+      if
+        i32.const 1
+        local.set $i1
+        i32.const 1
+        local.set $i2
+        i32.const 1
+        local.set $j2
+      else
+        local.get $x0
+        local.get $z0
+        f64.ge
+        if
+          i32.const 1
+          local.set $i1
+          i32.const 1
+          local.set $i2
+          i32.const 1
+          local.set $k2
+        else
+          i32.const 1
+          local.set $k1
+          i32.const 1
+          local.set $i2
+          i32.const 1
+          local.set $k2
+        end
+      end
+    else
+      local.get $y0
+      local.get $z0
+      f64.lt
+      if
+        i32.const 1
+        local.set $k1
+        i32.const 1
+        local.set $j2
+        i32.const 1
+        local.set $k2
+      else
+        local.get $x0
+        local.get $z0
+        f64.lt
+        if
+          i32.const 1
+          local.set $j1
+          i32.const 1
+          local.set $j2
+          i32.const 1
+          local.set $k2
+        else
+          i32.const 1
+          local.set $j1
+          i32.const 1
+          local.set $i2
+          i32.const 1
+          local.set $j2
+        end
+      end
+    end
+    ;; ii/jj/kk = ToInt32(i/j/k) & 255
+    local.get $i
+    i32.trunc_sat_f64_s
+    i32.const 255
+    i32.and
+    local.set $ii
+    local.get $j
+    i32.trunc_sat_f64_s
+    i32.const 255
+    i32.and
+    local.set $jj
+    local.get $k
+    i32.trunc_sat_f64_s
+    i32.const 255
+    i32.and
+    local.set $kk
+    ;; n0 = corner(x0, y0, z0, perm[ii + perm[jj + perm[kk]]])
+    local.get $x0
+    local.get $y0
+    local.get $z0
+    local.get $kk
+    i32.load8_u
+    local.get $jj
+    i32.add
+    i32.load8_u
+    local.get $ii
+    i32.add
+    i32.load8_u
+    call $simplexCorner
+    local.set $n0
+    ;; n1 = corner(x0 - i1 + 1/6, y0 - j1 + 1/6, z0 - k1 + 1/6,
+    ;;             perm[ii + i1 + perm[jj + j1 + perm[kk + k1]]])
+    local.get $x0
+    local.get $i1
+    f64.convert_i32_s
+    f64.sub
+    f64.const 0x1.5555555555555p-3
+    f64.add
+    local.get $y0
+    local.get $j1
+    f64.convert_i32_s
+    f64.sub
+    f64.const 0x1.5555555555555p-3
+    f64.add
+    local.get $z0
+    local.get $k1
+    f64.convert_i32_s
+    f64.sub
+    f64.const 0x1.5555555555555p-3
+    f64.add
+    local.get $kk
+    local.get $k1
+    i32.add
+    i32.load8_u
+    local.get $jj
+    local.get $j1
+    i32.add
+    i32.add
+    i32.load8_u
+    local.get $ii
+    local.get $i1
+    i32.add
+    i32.add
+    i32.load8_u
+    call $simplexCorner
+    local.set $n1
+    ;; n2 = corner(x0 - i2 + 1/3, y0 - j2 + 1/3, z0 - k2 + 1/3,
+    ;;             perm[ii + i2 + perm[jj + j2 + perm[kk + k2]]])
+    local.get $x0
+    local.get $i2
+    f64.convert_i32_s
+    f64.sub
+    f64.const 0x1.5555555555555p-2
+    f64.add
+    local.get $y0
+    local.get $j2
+    f64.convert_i32_s
+    f64.sub
+    f64.const 0x1.5555555555555p-2
+    f64.add
+    local.get $z0
+    local.get $k2
+    f64.convert_i32_s
+    f64.sub
+    f64.const 0x1.5555555555555p-2
+    f64.add
+    local.get $kk
+    local.get $k2
+    i32.add
+    i32.load8_u
+    local.get $jj
+    local.get $j2
+    i32.add
+    i32.add
+    i32.load8_u
+    local.get $ii
+    local.get $i2
+    i32.add
+    i32.add
+    i32.load8_u
+    call $simplexCorner
+    local.set $n2
+    ;; n3 = corner(x0 - 1 + 0.5, y0 - 1 + 0.5, z0 - 1 + 0.5,
+    ;;             perm[ii + 1 + perm[jj + 1 + perm[kk + 1]]])
+    local.get $x0
+    f64.const 1
+    f64.sub
+    f64.const 0.5
+    f64.add
+    local.get $y0
+    f64.const 1
+    f64.sub
+    f64.const 0.5
+    f64.add
+    local.get $z0
+    f64.const 1
+    f64.sub
+    f64.const 0.5
+    f64.add
+    local.get $kk
+    i32.const 1
+    i32.add
+    i32.load8_u
+    local.get $jj
+    i32.const 1
+    i32.add
+    i32.add
+    i32.load8_u
+    local.get $ii
+    i32.const 1
+    i32.add
+    i32.add
+    i32.load8_u
+    call $simplexCorner
+    local.set $n3
+    ;; (n1 + n0 + n2 + n3) * 32
+    local.get $n1
+    local.get $n0
+    f64.add
+    local.get $n2
+    f64.add
+    local.get $n3
+    f64.add
+    f64.const 32
+    f64.mul
+  )
+
+  ;; Batch entry: out[i] = simplex3(ax[i], ay[i], time) for i in [0, n).
+  ;; ax/ay/out are host-managed scratch pointers after the tables (see
+  ;; RenderKernel.noiseAngles); the walk is sequential f64 loads/stores.
+  (func (export "noise")
+    (param $axPtr i32) (param $ayPtr i32) (param $outPtr i32) (param $n i32) (param $time f64)
+    (local $i i32)
+    block $done
+      loop $particles
+        local.get $i
+        local.get $n
+        i32.ge_s
+        br_if $done
+        ;; store address first, then the value the call leaves on top
+        local.get $outPtr
+        local.get $i
+        i32.const 3
+        i32.shl
+        i32.add
+        local.get $axPtr
+        local.get $i
+        i32.const 3
+        i32.shl
+        i32.add
+        f64.load
+        local.get $ayPtr
+        local.get $i
+        i32.const 3
+        i32.shl
+        i32.add
+        f64.load
+        local.get $time
+        call $simplex
+        f64.store
+        local.get $i
+        i32.const 1
+        i32.add
+        local.set $i
+        br $particles
+      end
+    end
+  )
 )
