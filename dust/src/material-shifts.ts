@@ -70,6 +70,9 @@ class ShiftPortalSimulation extends PortalSimulation {
     const material = this.shiftMaterial, p = this.particles[this.particles.length - 1];
     p.color = material.color; p.alpha = Math.fround((material.color >>> 24) / 255);
     p.glow = material.glow > 0; p.cellType = material.cellType;
+    // color/cellType feed the cached kernel meta word (Particle.kernelMeta);
+    // they changed, so the cache must recompute on the next staging.
+    p.kernelMeta = undefined;
   }
 }
 export function makeShiftSimulation(

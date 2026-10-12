@@ -11,6 +11,11 @@
 //   bun scripts/render-diff.ts --exact-regression <baseline.json>
 //       (--against is an alias.) Renders the exact path and requires every
 //       frame hash to match the baseline snapshot byte-for-byte.
+//   bun scripts/render-diff.ts --kernel
+//       Renders DRIFT_FRAMES meditation frames twice with fastParticles off:
+//       the JS blend loop vs the wasm blend kernel (particleMirror staging +
+//       render kernel module). Every frame hash must match byte-for-byte;
+//       also prints mean step/render times for both sides.
 //   bun scripts/render-diff.ts --update-baseline <baseline>
 //       (Re)records the baseline snapshot.
 //
@@ -244,6 +249,60 @@ function runDrift(harness: Harness): boolean {
   return pass;
 }
 
+// ---- kernel mode ----------------------------------------------------------
+
+// Byte-identity gate for the wasm blend kernel path: the JS loop (exact
+// simulation) is the reference; the kernel renderer must reproduce every
+// frame exactly. fastParticles stays off on both sides so the comparison
+// isolates the renderer, not the particle integration.
+function runKernel(harness: Harness): boolean {
+  const width = PREVIEW_RENDER_WIDTH,
+    height = PREVIEW_RENDER_HEIGHT;
+  const { scale } = fullscreenView(width, height, 1);
+  const jsSim = buildSimulation(harness, meditationReplay(width, height, false));
+  const wasmSim = buildSimulation(harness, meditationReplay(width, height, false));
+  const jsRenderer = buildRenderer(harness, width, height, scale);
+  const wasmRenderer = buildRenderer(harness, width, height, scale, harness.renderKernelModule);
+  let jsStep = 0,
+    jsRender = 0,
+    wasmStep = 0,
+    wasmRender = 0;
+  for (let frame = 0; frame < DRIFT_FRAMES; frame++) {
+    let t = performance.now();
+    jsSim.step();
+    jsStep += performance.now() - t;
+    t = performance.now();
+    const a = jsRenderer.render(jsSim, MEDITATION_RENDER, true, null);
+    jsRender += performance.now() - t;
+    t = performance.now();
+    wasmSim.step();
+    wasmStep += performance.now() - t;
+    t = performance.now();
+    const b = wasmRenderer.render(wasmSim, MEDITATION_RENDER, true, null);
+    wasmRender += performance.now() - t;
+    const ha = hashPixels(a),
+      hb = hashPixels(b);
+    if (ha.hash !== hb.hash || ha.alphaBad || hb.alphaBad) {
+      console.log(
+        `FAIL kernel frame ${frame + 1}: js ${ha.hash} vs wasm ${hb.hash}` +
+          (ha.alphaBad || hb.alphaBad ? " (alpha plane broken)" : ""),
+      );
+      return false;
+    }
+  }
+  console.log(
+    `PASS kernel: ${DRIFT_FRAMES} frames byte-identical to the JS blend loop`,
+  );
+  const n = DRIFT_FRAMES;
+  console.log(
+    `  js   step ${(jsStep / n).toFixed(2)}ms render ${(jsRender / n).toFixed(2)}ms`,
+  );
+  console.log(
+    `  wasm step ${(wasmStep / n).toFixed(2)}ms render ${(wasmRender / n).toFixed(2)}ms`,
+  );
+  return true;
+}
+
 // ---- baseline modes -------------------------------------------------------
 
 function updateBaseline(harness: Harness, path: string): boolean {
@@ -319,5 +378,7 @@ const ok = baselineMode
   ? process.argv.includes("--update-baseline")
     ? updateBaseline(harness, fileArg(DEFAULT_BASELINE))
     : exactRegression(harness, fileArg(DEFAULT_BASELINE))
-  : runDrift(harness);
+  : process.argv.includes("--kernel")
+    ? runKernel(harness)
+    : runDrift(harness);
 if (!ok) process.exit(1);

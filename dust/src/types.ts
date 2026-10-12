@@ -168,6 +168,13 @@ export type Particle = {
   targetY?: number;
   mathEdge?: number;
   mathEmitter?: number;
+  // Cached render-kernel meta word (src/render-kernel.ts: bit0 onGrid ===
+  // false, bit1 drawLong, bit2 wide, bits 8-31 packed color shifted so r sits
+  // at bits 24-31). Every input is fixed at emission EXCEPT color/cellType,
+  // which only material-shifts mutates — that site must reset the cache to
+  // undefined. Portal/meditation/math particles cache in emit(); other
+  // emitters cache lazily in PortalSimulation.stageMirror. Absent = uncomputed.
+  kernelMeta?: number;
 };
 export type SpriteParticle = {
   sprite: SpriteSpec;
@@ -299,6 +306,10 @@ export type ImageSettings = {
 };
 export type MaskSettingsInput = Partial<MaskSettings>;
 export type ImageSettingsInput = Partial<ImageSettings>;
+// The packed color particles blend with when they carry no color of their own
+// (SoftwareRenderer.rgb decodes r = packed >>> 16 & 255 → rgb 180/60/255).
+// Shared so the render kernel's SoA staging mirror packs the same fallback.
+export const PARTICLE_PURPLE = 0x44b43cff;
 export type ImageEmitterOptions = {
   mask?: unknown;
   settings?: unknown;
@@ -342,6 +353,13 @@ export type SimulationOptions = {
   // differ from the native retention. Opt-in (meditation page); has no
   // effect unless retainInvisible is false. Defaults off.
   cullInvisible?: boolean;
+  // Opt-in SoA staging mirror for the wasm blend kernel (src/render-kernel.ts):
+  // advanceParticles additionally packs the pool's x/y/alpha/color/flags into
+  // flat columns the renderer's kernel path consumes directly. Pure staging
+  // (the pool order, motion and rendering are unchanged); enables the kernel
+  // path only when the renderer was built with a render kernel module.
+  // Defaults off.
+  particleMirror?: boolean;
   imageEmitter?: ImageEmitterOptions;
   imageOnce?: boolean;
   custom_image?: boolean;

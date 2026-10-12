@@ -8,6 +8,7 @@ import {
   EmitterState,
   EmissionPoint,
   ImageSettings,
+  PARTICLE_PURPLE,
   Particle,
   ParticleQuad,
   Resources,
@@ -89,19 +90,15 @@ function corner(x: number, y: number, z: number, index: number) {
 }
 export function simplex3(x: number, y: number, z: number) {
   const s = (x + y + z) * (1 / 3);
-  const i = Math.floor(x + s),
-    j = Math.floor(y + s),
-    k = Math.floor(z + s);
+  const i = Math.floor(x + s);
+  const j = Math.floor(y + s);
+  const k = Math.floor(z + s);
   const t = (i + j + k) * (1 / 6);
-  const x0 = x - (i - t),
-    y0 = y - (j - t),
-    z0 = z - (k - t);
-  let i1 = 0,
-    j1 = 0,
-    k1 = 0,
-    i2 = 0,
-    j2 = 0,
-    k2 = 0;
+  const x0 = x - (i - t);
+  const y0 = y - (j - t);
+  const z0 = z - (k - t);
+  let i1 = 0, j1 = 0, k1 = 0;
+  let i2 = 0, j2 = 0, k2 = 0;
   if (x0 >= y0) {
     if (y0 >= z0) {
       i1 = 1;
@@ -644,6 +641,19 @@ export class PortalSimulation {
   // Opt-in drop of never-visible particles (SimulationOptions.cullInvisible);
   // default false keeps the native retention semantics.
   declare cullInvisible: boolean;
+  // Opt-in SoA staging mirror (SimulationOptions.particleMirror): flat columns
+  // rebuilt at the end of every advanceParticles in pool order for the
+  // renderer's wasm blend kernel. Pure staging — the pool, motion, RNG and
+  // rendering are identical with or without it. The drawLong count is the
+  // defensive tripwire that keeps drawLong particles on the JS render path
+  // (the kernel does not rasterize their long segments).
+  declare particleMirror: boolean;
+  declare mirrorXs: Float64Array;
+  declare mirrorYs: Float64Array;
+  declare mirrorAs: Float64Array;
+  declare mirrorMeta: Uint32Array;
+  declare mirrorN: number;
+  declare mirrorDrawLong: number;
   // Optional surface of specialized simulations; the base class leaves them
   // unset so polymorphic callers can probe which kind of body is running.
   declare definition?: {sprites?: SpriteSpec[]; lifetime?: number};
@@ -674,6 +684,7 @@ export class PortalSimulation {
     ambientRing = true,
     fastParticles = false,
     cullInvisible = false,
+    particleMirror = false,
   }: SimulationOptions = {}) {
     if (!Object.prototype.hasOwnProperty.call(EFFECTS, effect))
       throw new RangeError("Unknown portal effect");
@@ -723,6 +734,7 @@ export class PortalSimulation {
       ambientRing,
       fastParticles,
       cullInvisible,
+      particleMirror,
     });
     // Authored presentation floor (meditation page); only ever lengthens the
     // native trail, never shortens it.
@@ -735,6 +747,12 @@ export class PortalSimulation {
     this.lifetimeRng = new NoitaRandom(lifetimeSeed);
     this.particles = [];
     this.visibleCount = 0;
+    this.mirrorXs = new Float64Array(0);
+    this.mirrorYs = new Float64Array(0);
+    this.mirrorAs = new Float64Array(0);
+    this.mirrorMeta = new Uint32Array(0);
+    this.mirrorN = 0;
+    this.mirrorDrawLong = 0;
     this.points = [];
     this.previousPoints = Array.from({ length: 8 }, () => ({
       x: this.x,
@@ -785,6 +803,8 @@ export class PortalSimulation {
     this.lifetimeRng.next(); // grid::Particle constructor's random call
     const life = this.lifetimeRng.float(config.lifeMin, config.lifeMax);
     this.lifetimeRng.integer(0, 100); // cosmetic-create draw; render_on_grid is subsequently overwritten
+    const drawLong = config.drawLong ?? false;
+    const onGrid = previous && this.density > 1 ? false : undefined;
     this.particles.push({
       x: Math.fround(x + 0.5),
       y: Math.fround(y + 0.5),
@@ -802,11 +822,17 @@ export class PortalSimulation {
       fadeRate: config.fade ? Math.fround(-1 / life) : 0,
       airflowForce: config.force,
       airflowScale: config.scale,
-      drawLong: config.drawLong ?? false,
+      drawLong,
       // Scaled views emit sub-cell trail steps; snapping their quads back to
       // world cells (the density-1 native rendering) re-quantizes the ~half
       // pixel spacing into a coarse visible lattice. Only scaled views opt out.
-      onGrid: previous && this.density > 1 ? false : undefined,
+      onGrid,
+      // Precomputed kernel meta word: emit() sets no color (the purple
+      // fallback packs in) and wide needs cellType, absent here. See
+      // Particle.kernelMeta for the cache contract.
+      kernelMeta:
+        (((PARTICLE_PURPLE << 8) | (onGrid === false ? 1 : 0) | (drawLong ? 2 : 0)) >>>
+          0),
     });
     this.totalEmitted++;
   }
@@ -904,9 +930,67 @@ export class PortalSimulation {
     }
     this.visibleCount = visible;
     this.particles.length = write;
+    if (this.particleMirror) this.stageMirror();
+    else this.mirrorN = 0;
     this.elapsedFrames++;
     this.frame++;
     this.time = Math.fround(this.time + DT);
+  }
+  // Pack the current pool (already compacted, render order = pool order) into
+  // the flat columns the wasm blend kernel walks. Meta word layout matches
+  // src/render-kernel.ts: bit0 onGrid === false, bit1 drawLong, bit2 wide
+  // (singleWidth === false && cellType gas/fire), bits 8-31 the packed color
+  // shifted so r sits at bits 24-31 — the kernel decodes r = (m >>> 24) & 255,
+  // g = (m >>> 16) & 255, b = (m >>> 8) & 255, and SoftwareRenderer.rgb
+  // decodes r = (packed >>> 16) & 255, so the shift maps one to the other.
+  stageMirror() {
+    const particles = this.particles;
+    const n = particles.length;
+    let xs = this.mirrorXs,
+      ys = this.mirrorYs,
+      as = this.mirrorAs,
+      meta = this.mirrorMeta;
+    const need = n + 1; // +1: alpha-0 pad lane for the kernel's odd-n pair tail
+    if (xs.length < need) {
+      const cap = Math.max(need, xs.length * 2, 1024);
+      xs = this.mirrorXs = new Float64Array(cap);
+      ys = this.mirrorYs = new Float64Array(cap);
+      as = this.mirrorAs = new Float64Array(cap);
+      meta = this.mirrorMeta = new Uint32Array(cap);
+    }
+    let drawLong = 0;
+    for (let i = 0; i < n; i++) {
+      const p = particles[i]!;
+      xs[i] = p.x;
+      ys[i] = p.y;
+      as[i] = p.alpha;
+      // Meta inputs are immutable after emission except color/cellType
+      // (material-shifts, which resets the cache); portal-family particles
+      // arrive precomputed, others cache here on first staging.
+      let m = p.kernelMeta;
+      if (m === undefined) {
+        m = (p.color ?? PARTICLE_PURPLE) << 8;
+        if (p.onGrid === false) m |= 1;
+        if (p.drawLong) m |= 2;
+        if (
+          p.singleWidth === false &&
+          (p.cellType === "gas" || p.cellType === "fire")
+        )
+          m |= 4;
+        m = m >>> 0;
+        p.kernelMeta = m;
+      }
+      meta[i] = m;
+      // JS hands every drawLong particle with alpha > 0 to drawParticle —
+      // the kernel cannot reproduce those, so the renderer's gate needs the
+      // worst-case count (no margin cull: culling only reduces it).
+      if ((m & 2) !== 0 && p.alpha > 0) drawLong++;
+    }
+    // The kernel reads ceil(n/2) pairs; the pad lane dies on its alpha test.
+    as[n] = 0;
+    meta[n] = 0;
+    this.mirrorN = n;
+    this.mirrorDrawLong = drawLong;
   }
 }
 

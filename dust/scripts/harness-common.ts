@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import { decodeAssets, makeSimulation } from "../src/effect-simulation";
 import { SoftwareRenderer } from "../src/software-renderer";
 import { fullscreenView } from "../src/render-resolution";
+import { RENDER_KERNEL_WASM } from "../src/render-kernel-wasm";
 import type { PortalSimulation } from "../src/portal-physics";
 import type { Catalog, Resources, SimulationOptions } from "../src/types";
 
@@ -15,6 +16,7 @@ export type Harness = {
   resources: Resources;
   buffer: ArrayBuffer;
   kernelModule: WebAssembly.Module;
+  renderKernelModule: WebAssembly.Module;
 };
 
 export function loadHarness(): Harness {
@@ -27,7 +29,10 @@ export function loadHarness(): Harness {
   const kernelModule = new WebAssembly.Module(
     readFileSync(`${ROOT}dist/assets/raster.wasm`),
   );
-  return { catalog, resources, buffer, kernelModule };
+  const renderKernelModule = new WebAssembly.Module(
+    Buffer.from(RENDER_KERNEL_WASM, "base64"),
+  );
+  return { catalog, resources, buffer, kernelModule, renderKernelModule };
 }
 
 // The meditation page's render options (src/meditation.ts), after the worker's
@@ -70,6 +75,7 @@ export function meditationReplay(
     retainInvisible: false,
     fastParticles,
     cullInvisible: true,
+    particleMirror: true,
   };
 }
 
@@ -85,9 +91,11 @@ export function buildRenderer(
   width: number,
   height: number,
   scale: number,
+  renderKernelModule: WebAssembly.Module | null = null,
 ): SoftwareRenderer {
   return new SoftwareRenderer(width, height, harness.resources, harness.catalog, {
     kernelModule: harness.kernelModule,
+    renderKernelModule,
     scale,
   });
 }

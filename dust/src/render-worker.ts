@@ -10,7 +10,7 @@ globalThis.onmessage = ({ data }) => {
         data.width,
         data.height,
         data.kernelModule,
-        { scale: data.scale },
+        { scale: data.scale, renderKernelModule: data.renderKernelModule },
       );
       runtime.restart(data.replay, data.revision);
       result = runtime.frame({

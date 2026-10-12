@@ -5,10 +5,12 @@
 //
 // Usage:
 //   bun scripts/bench-meditation.ts [--width 1920] [--height 1080]
-//       [--warmup 400] [--measure 60] [--exact | --fast]
+//       [--warmup 400] [--measure 60] [--exact | --fast] [--kernel]
 // The default measures the page's current configuration (fastParticles: true
 // since the fast path was enabled there); --exact forces the fround reference
-// for A/B comparison.
+// for A/B comparison; --kernel also hands the renderer the wasm blend kernel
+// (particleMirror staging is always on in the replay), isolating the
+// kernel path's render gain at this page's exact configuration.
 import {
   buildRenderer,
   buildSimulation,
@@ -28,12 +30,13 @@ const width = numArg("width", 1920),
   height = numArg("height", 1080),
   warmup = numArg("warmup", 400),
   measure = numArg("measure", 60),
-  fast = process.argv.includes("--exact") ? false : true;
+  fast = process.argv.includes("--exact") ? false : true,
+  kernel = process.argv.includes("--kernel");
 
 const harness = loadHarness();
 const view = fullscreenView(width, height, 1);
 const sim = buildSimulation(harness, meditationReplay(width, height, fast));
-const renderer = buildRenderer(harness, width, height, view.scale);
+const renderer = buildRenderer(harness, width, height, view.scale, kernel ? harness.renderKernelModule : null);
 
 for (let i = 0; i < warmup; i++) {
   sim.step();
@@ -56,7 +59,7 @@ const stepAvg = stepMs / measure,
   renderAvg = renderMs / measure;
 console.log(
   `meditation ${width}x${height} scale=${view.scale.toFixed(3)} ` +
-    `density=${(view.scale * 2).toFixed(2)} fast=${fast} ` +
+    `density=${(view.scale * 2).toFixed(2)} fast=${fast} kernel=${kernel} ` +
     `particles=${sim.particles.length}`,
 );
 console.log(

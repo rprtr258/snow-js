@@ -3,6 +3,7 @@
 // Frames stay on the shared worker so sizing, resizing and fullscreen never
 // wait for the software rasterizer. Pressing D toggles a hidden debug overlay.
 import { fullscreenView } from "./render-resolution";
+import { compileRenderKernel } from "./render-kernel";
 import { loadRasterModule } from "./wasm-raster";
 import { Catalog, RawOptions, SimulationOptions } from "./types";
 
@@ -29,7 +30,10 @@ const options: RawOptions = { core: true, glow: false, color: null, background: 
 // they can never render again, so the image is unchanged, but the pool stays
 // at the visible population instead of the native retention to life expiry
 // (the debug overlay's particle count reflects that).
-const replay: SimulationOptions = { worldSeed: 0, x: 0, y: 0, startFrame: 0, effect: "meditation", mathTrailScale: 3, minTrailLifetime: 3.5, ambientRing: false, fastParticles: true, cullInvisible: true };
+// particleMirror stages the pool into flat columns every step so the
+// renderer's wasm blend kernel can take the particle blend (the renderer
+// still falls back to the JS loop whenever the kernel gate does not match).
+const replay: SimulationOptions = { worldSeed: 0, x: 0, y: 0, startFrame: 0, effect: "meditation", mathTrailScale: 3, minTrailLifetime: 3.5, ambientRing: false, fastParticles: true, cullInvisible: true, particleMirror: true };
 
 type Layout = {width: number; height: number; scale: number};
 type WorkerMessage = {
@@ -43,6 +47,7 @@ let view: Layout | null = null;
 let catalog: Catalog | null = null;
 let bytes: ArrayBuffer | null = null;
 let kernelModule: WebAssembly.Module | null = null;
+let renderKernelModule: WebAssembly.Module | null = null;
 let revision = 0;
 let recycled: ArrayBufferLike | null = null;
 let lastTime: number | null = null;
@@ -97,6 +102,7 @@ function init() {
       catalog,
       buffer,
       kernelModule,
+      renderKernelModule,
       width: view!.width,
       height: view!.height,
       scale: view!.scale,
@@ -186,6 +192,9 @@ async function start() {
   catalog = await meta.json();
   bytes = await asset.arrayBuffer();
   kernelModule = kernel;
+  // The blend kernel compiles from the binary embedded in the bundle; null
+  // just keeps the renderer on its JS particle loop.
+  renderKernelModule = compileRenderKernel();
   addEventListener("resize", () => {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(init, 200);

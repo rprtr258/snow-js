@@ -1,10 +1,12 @@
 // Full-resolution, deterministic rasterizer. No WebGL, canvas calls, random draws,
 // particle thinning, frame interpolation, or reduced-resolution glow here.
 import { writeParticleVertices, particleQuad, PortalSimulation } from "./portal-physics";
+import { RenderKernel } from "./render-kernel";
 import { GlowTap, RasterTexture, WasmRaster } from "./wasm-raster";
 import { glowDitherField, GLOW_DITHER_TILE } from "./glow-dither";
 import {
   Catalog,
+  PARTICLE_PURPLE,
   Particle,
   Rect,
   Resources,
@@ -12,7 +14,7 @@ import {
   SpriteSpec,
 } from "./types";
 const f = (x: number) => x;
-const PURPLE = 0x44b43cff;
+const PURPLE = PARTICLE_PURPLE;
 const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
 const roundCell = (x: number) => Math.floor(x + (x >= 0 ? 0.5 : -0.5));
 // The u32 scene clear (render, background fast path) packs RGBA bytes in
@@ -197,14 +199,20 @@ export class SoftwareRenderer {
   declare centerY: number | null;
   declare scale: number;
   declare ditherNoise: Float32Array | undefined;
+  // Wasm blend kernel host (render-kernel.ts). Non-null only when the caller
+  // passes a compiled render kernel module; render() then blends the
+  // simulation's staged particle columns on the kernel path when the frame
+  // matches its gate, and the scene buffer is a view onto kernel memory.
+  declare renderKernel: RenderKernel | null;
   constructor(
     width: number,
     height: number,
     resources: Resources,
     catalog: Catalog,
-    { aggregateGlow = true, kernelModule = null, scale = 1 }: {
+    { aggregateGlow = true, kernelModule = null, renderKernelModule = null, scale = 1 }: {
       aggregateGlow?: boolean;
       kernelModule?: WebAssembly.Module | null;
+      renderKernelModule?: WebAssembly.Module | null;
       scale?: number;
     } = {},
   ) {
@@ -218,7 +226,13 @@ export class SoftwareRenderer {
     this.monochrome = false;
     this.monochromeTextures = new Map();
     this.ditherTile = GLOW_DITHER_TILE;
-    this.scene = new Uint8ClampedArray(width * height * 4);
+    this.renderKernel = renderKernelModule
+      ? new RenderKernel(renderKernelModule)
+      : null;
+    this.renderKernel?.ensure(width * height * 4, 0);
+    this.scene = this.renderKernel
+      ? this.renderKernel.sceneView(width * height * 4)
+      : new Uint8ClampedArray(width * height * 4);
     this.source = new Float32Array(width * height * 3);
     this.history = new Float32Array(width * height * 3);
     this.horizontal = new Float32Array(width * height * 3);
@@ -252,7 +266,11 @@ export class SoftwareRenderer {
         this.edgeWeights[y * width + x] = weight;
       }
     this.native = null;
-    if (kernelModule) {
+    // The wasm blend kernel and the wasm rasterizer own separate linear
+    // memories; the kernel path needs the scene buffer to live in its own
+    // memory, so the two hosts are mutually exclusive. Consumers pass both
+    // modules only when they never rasterize glow (the meditation page).
+    if (kernelModule && !this.renderKernel) {
       try {
         this.native = new WasmRaster(
           kernelModule,
@@ -818,7 +836,50 @@ export class SoftwareRenderer {
       sceneWidth = this.width,
       sceneHeight = this.height,
       scene = this.scene;
-    for (let i = 0; i < sim.particles.length; i++) {
+    // Wasm blend kernel path: the simulation staged its pool into flat
+    // columns (particleMirror), the frame skips glow and color override, and
+    // no drawLong particle can render (the kernel does not rasterize their
+    // stroke quads — the staged count is the worst case, margin culls only
+    // reduce it). The kernel then writes the same scene bytes as the JS loop
+    // below: byte-identical per scripts/proto-render-kernel.ts and enforced
+    // per-run by scripts/render-diff.ts --kernel.
+    const kern = this.renderKernel;
+    let kernelRendered = false;
+    if (
+      kern &&
+      !buildGlow &&
+      this.colorOverride === null &&
+      sim.particleMirror &&
+      sim.mirrorN > 0 &&
+      sim.mirrorDrawLong === 0
+    ) {
+      const sceneBytes = sceneWidth * sceneHeight * 4;
+      // A grow to fit larger staging detaches the scene views (bytes
+      // survive): rewrap them, and drop the stale scene32 view.
+      if (kern.ensure(sceneBytes, sim.mirrorN)) {
+        this.scene = kern.sceneView(sceneBytes);
+        this.scene32 = undefined;
+      }
+      kern.render(
+        sceneBytes,
+        {
+          xs: sim.mirrorXs,
+          ys: sim.mirrorYs,
+          as: sim.mirrorAs,
+          meta: sim.mirrorMeta,
+          n: sim.mirrorN,
+        },
+        scale,
+        ox,
+        oy,
+        margin,
+        sceneWidth,
+        sceneHeight,
+      );
+      kernelRendered = true;
+    }
+    if (!kernelRendered) {
+      for (let i = 0; i < sim.particles.length; i++) {
       const p = sim.particles[i];
       if (p.alpha <= 0) continue;
       const x = p.x * scale + ox,
@@ -866,6 +927,7 @@ export class SoftwareRenderer {
           }
       }
       if (buildGlow && p.glow !== false) this.particleGlow(p, color, ox, oy);
+    }
     }
     if (core) {
       // Original figures have a steady, faint contour even while paused. This

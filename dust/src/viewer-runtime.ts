@@ -57,6 +57,7 @@ export class ViewerRuntime {
   declare simulation: PortalSimulation;
   declare allowImageReplay: (cycleFrames: number) => boolean;
   declare scale: number;
+  declare renderKernelModule: WebAssembly.Module | null;
   declare viewWidth: number;
   declare viewHeight: number;
   constructor(
@@ -70,16 +71,19 @@ export class ViewerRuntime {
       setupSimulation = () => {},
       allowImageReplay = () => true,
       scale = 1,
+      renderKernelModule = null,
     }: {
       replayImages?: boolean;
       setupSimulation?: (simulation: PortalSimulation) => void;
       allowImageReplay?: (cycleFrames: number) => boolean;
       scale?: number;
+      renderKernelModule?: WebAssembly.Module | null;
     } = {},
   ) {
     this.catalog = catalog;
     this.resources = decodeAssets(catalog, buffer);
     this.kernelModule = kernelModule;
+    this.renderKernelModule = renderKernelModule;
     // `scale` is the world→pixel factor only - it must stay exact (no flooring);
     // width and height ARE the render buffer, in pixels.
     this.scale = scale;
@@ -91,7 +95,7 @@ export class ViewerRuntime {
       height,
       this.resources,
       catalog,
-      { kernelModule, scale: this.scale },
+      { kernelModule, renderKernelModule, scale: this.scale },
     );
     this.renderScale = 1;
     this.options = normalizeOptions({ core: true, glow: true });
@@ -107,7 +111,7 @@ export class ViewerRuntime {
     const old = this.renderer;
     const changed = old.width !== width || old.height !== height || (old.centerX ?? 0) !== centerX || (old.centerY ?? 0) !== centerY;
     if (old.width !== width || old.height !== height)
-      this.renderer = new SoftwareRenderer(width, height, this.resources, this.catalog, { kernelModule: this.kernelModule, scale: this.scale });
+      this.renderer = new SoftwareRenderer(width, height, this.resources, this.catalog, { kernelModule: this.kernelModule, renderKernelModule: this.renderKernelModule, scale: this.scale });
     else if (changed) old.clear();
     Object.assign(this.renderer, { centerX, centerY });
   }

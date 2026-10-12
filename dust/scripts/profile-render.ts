@@ -4,7 +4,6 @@ import { readFileSync } from "node:fs";
 import { decodeAssets, makeSimulation } from "../src/effect-simulation";
 import { SoftwareRenderer } from "../src/software-renderer";
 import { fullscreenView } from "../src/render-resolution";
-import { ffgrepUnused } from "./noop"; // eslint-disable-line
 import type { Catalog, Resources, SimulationOptions } from "../src/types";
 
 const ROOT = new URL("..", import.meta.url).pathname;
