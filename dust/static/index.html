@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en" data-bs-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dust · Particle animations</title>
+    <meta name="description" content="Explore Noita particle animations, mathematical figures, a fullscreen demo, material shifts and custom image emitters." />
+    <link rel="canonical" href="https://dust.runfast.stream/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Dust" />
+    <meta property="og:title" content="Dust" />
+    <meta property="og:description" content="Explore Noita particle animations, mathematical figures, a fullscreen demo, material shifts and custom image emitters." />
+    <meta property="og:url" content="https://dust.runfast.stream/" />
+    <meta property="og:image" content="https://dust.runfast.stream/dust-logo.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="306" />
+    <meta property="og:image:height" content="127" />
+    <meta property="og:image:alt" content="Dust logo" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <link rel="stylesheet" href="/vendor/bootstrap/bootstrap.min.css" />
+    <link rel="stylesheet" href="/vendor/noitamap/theme.css" />
+    <link rel="stylesheet" href="/vendor/noitamap/controls.css" />
+    <link rel="stylesheet" href="/ui-theme.css" />
+    <script defer src="/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+    <link rel="stylesheet" href="/portal.css" />
+    <link rel="stylesheet" href="/gif-export.css" />
+  </head>
+  <body class="dust-page ">
+    <nav class="navbar navbar-dark dust-navbar" aria-label="Main navigation"><div class="container-fluid">
+      <a class="navbar-brand" href="/" aria-label="dust home"><img class="brand-logo" src="/dust-logo.svg" alt="dust" width="306" height="127" /></a>
+      <span class="nav-description">Noita particle rules · original assets</span>
+      <div class="shell-actions">
+        <button class="btn btn-sm btn-outline-light d-lg-none" type="button" data-ui-shell data-bs-toggle="offcanvas" data-bs-target="#page-settings" aria-controls="page-settings">Controls</button>
+      </div>
+    </div></nav>
+    <main class="dust-workspace">
+      <aside id="page-settings" class="offcanvas-lg offcanvas-end settings-panel" tabindex="-1" aria-labelledby="settings-title">
+        <div class="offcanvas-header"><h2 id="settings-title" class="offcanvas-title">Single effect settings</h2><button type="button" class="btn-close d-lg-none" data-ui-shell data-bs-dismiss="offcanvas" data-bs-target="#page-settings" aria-label="Close controls"></button></div>
+        <div class="offcanvas-body settings-content">
+        <label for="collection">Collection</label>
+        <select class="form-select form-select-sm" id="collection">
+          <option value="game">Noita effects</option>
+          <option value="math">Mathematical figures · original</option>
+        </select>
+        <label for="effect">Effect</label>
+        <select class="form-select form-select-sm" id="effect" aria-label="Effect"></select>
+        <p id="status" class="source debug-only">Loading the worker renderer…</p>
+        <div class="buttons">
+          <button class="btn btn-sm btn-outline-light" id="restart" type="button">Restart</button>
+        </div>
+        <label for="speed">Playback</label>
+        <select class="form-select form-select-sm" id="speed">
+          <option value="0.25">¼ speed</option>
+          <option value="0.5">½ speed</option>
+          <option value="1" selected>Normal · 60 steps/s</option>
+          <option value="2">2× speed</option>
+        </select>
+        <fieldset id="math-controls" hidden>
+          <legend>Math figures</legend>
+          <div class="control-heading">
+            <label for="math-trail">Trail lifetime</label>
+            <output id="math-trail-value" for="math-trail">1.5×</output>
+          </div>
+          <input class="form-range"
+            id="math-trail"
+            type="range"
+            min="0.5"
+            max="3"
+            step="0.1"
+            value="1.5"
+            aria-describedby="math-trail-help"
+          />
+          <div class="range-labels" aria-hidden="true"><span>Short / crisp</span><span>Long / flowing</span></div>
+          <p id="math-trail-help">
+            Applies live to new sparks; existing trails fade naturally. 1× uses meditation's lifetime. Noita effects are
+            unchanged.
+          </p>
+          <button class="btn btn-sm btn-outline-light" id="math-trail-reset" type="button">Reset trails · 1.5×</button>
+        </fieldset>
+        <div class="control-heading">
+          <label for="zoom">Pixel scale</label>
+          <output id="zoom-value" for="zoom">1×</output>
+        </div>
+        <input class="form-range" id="zoom" type="range" min="1" max="10" step="1" value="1" />
+        <div class="range-labels" aria-hidden="true"><span>1×</span><span>10×</span></div>
+        <label class="check"><input class="form-check-input" id="core" type="checkbox" checked /> Object / portal sprite</label>
+        <label class="check"><input class="form-check-input" id="glow" type="checkbox" checked /> Glow preview</label>
+        <fieldset id="color-controls">
+          <legend>Colors</legend>
+          <p class="source debug-only">Presentation only; physics, RNG and sprites are unchanged.</p>
+          <p class="swatch-label">Particles</p>
+          <div id="particle-swatch"></div>
+          <p class="swatch-label">Background</p>
+          <div id="background-swatch"></div>
+        </fieldset>
+        <details class="debug-only">
+          <summary>Replay state</summary>
+          <p>World coordinates affect the noise and cube geometry. These are replay inputs, not physics adjustments.</p>
+          <form id="replay">
+            <label for="seed">World seed</label
+            ><input class="form-control form-control-sm" id="seed" type="number" value="0" min="0" max="4294967295" step="1" required />
+            <div class="columns">
+              <div>
+                <label for="world-x">World X</label
+                ><input class="form-control form-control-sm" id="world-x" type="number" value="0" min="-10000000" max="10000000" step="any" required />
+              </div>
+              <div>
+                <label for="world-y">World Y</label
+                ><input class="form-control form-control-sm" id="world-y" type="number" value="0" min="-10000000" max="10000000" step="any" required />
+              </div>
+            </div>
+            <button class="btn btn-sm btn-outline-light" type="submit">Apply &amp; restart</button>
+          </form>
+          <p>
+            The isolated random streams restart deterministically. Other in-game entities’ RNG calls are not reproduced.
+          </p>
+        </details>
+        <p id="source" class="source debug-only"></p>
+        <p id="origin-note" class="source debug-only"></p>
+        <label class="check debug-toggle"><input class="form-check-input" id="debug" type="checkbox" autocomplete="off" /> Debug info</label>
+      </div></aside>
+      <section id="fullscreen-target" class="preview" aria-label="Portal preview">
+        <div class="preview-toolbar">
+          <button class="btn btn-sm btn-outline-light" id="create-gif" type="button" disabled>Export animation</button>
+          <button class="btn btn-sm btn-outline-light" id="copy-link" type="button">Copy link</button
+          ><button class="btn btn-sm btn-outline-light" id="fullscreen" type="button" aria-pressed="false">Fullscreen</button>
+        </div>
+        <div class="viewport">
+          <canvas id="canvas" aria-label="Animated Noita portal"
+            >A browser with Canvas 2D is required for this preview.</canvas
+          >
+        </div>
+        <output id="stats" class="debug-only">Loading…</output>
+        <p id="error" role="alert" hidden></p>
+        <p class="notice debug-only">
+          <strong>Validation in progress.</strong> Native-reference tests cover particle motion, RNG, sprite updates,
+          and particle quads. All former effects now use this pipeline. World interactions and the full game compositor
+          are not reproduced; image/sprite spawning order still needs end-to-end validation. Mathematical figures are
+          original, not recovered game content.
+        </p>
+        <p id="eye-note" class="debug-only" hidden>
+          The eye-shaped chamber left of Hiisi Base uses teleport_hourglass_return.xml: nine rotating emitters, a
+          pulsing radius, and long particles. Restart shows the empty initial state.
+        </p>
+      </section>
+    </main>
+    <noscript>This simulation requires JavaScript.</noscript>
+    <script type="module" src="/portal-viewer.js"></script>
+    <script type="module" src="/ui-shell.js"></script>
+</body>
+</html>

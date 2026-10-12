@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Meditation cube portal</title>
+    <meta name="description" content="The Noita meditation cube portal animation on a fullscreen canvas." />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        background: #000;
+        overflow: hidden;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      #debug {
+        position: fixed;
+        top: 0;
+        left: 0;
+        margin: 0;
+        padding: 6px 8px;
+        font: 12px/1.5 monospace;
+        color: #9f9;
+        background: rgba(0, 0, 0, 0.6);
+        pointer-events: none;
+        white-space: pre;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+    <pre id="debug" hidden></pre>
+    <noscript>This simulation requires JavaScript.</noscript>
+    <script type="module" src="/meditation.js"></script>
+  </body>
+</html>

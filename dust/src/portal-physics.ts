@@ -1,0 +1,1091 @@
+// Build-specific, isolated cosmetic-particle reconstruction. See docs/portal-research.md.
+// No terrain, external forces, camera culling, or other entities' shared RNG calls.
+import { loopAngle } from "./loop-motion";
+import { FRAME_MS } from "./timing";
+import {
+  Catalog,
+  EmissionConfig,
+  EmitterState,
+  EmissionPoint,
+  ImageSettings,
+  PARTICLE_PURPLE,
+  Particle,
+  ParticleQuad,
+  Resources,
+  Segments,
+  SimulationOptions,
+  SpriteEmitterState,
+  SpriteParticle,
+  SpriteSpec,
+  TrailPoint,
+  V2,
+} from "./types";
+
+export const DT = Math.fround(1 / 60);
+export const RNG_SCALE = 4.656612875e-10;
+export const BUILD = "17130612";
+export const MAX_PARTICLES = 1000000;
+export const SPARK = Object.freeze({
+  r: Math.fround(180 / 255),
+  g: Math.fround(60 / 255),
+  b: 1,
+  alpha: Math.fround(68 / 255),
+  glow: 60,
+});
+export const EFFECTS = Object.freeze({
+  holy_mountain: Object.freeze({
+    label: "Holy Mountain portal",
+    source: "teleport_liquid_powered.xml",
+  }),
+  meditation: Object.freeze({
+    label: "Meditation cube portal",
+    source: "teleport_meditation_cube_return.xml",
+  }),
+  eye_room: Object.freeze({
+    label: "Hiisi Base eye-room portal",
+    source: "teleport_hourglass_return.xml",
+  }),
+});
+
+// 0x00fdf530 (int16[256]); 0x00872560, the game's 3D simplex noise.
+export const SIMPLEX_PERMUTATION = Object.freeze([
+  151, 160, 137, 91, 90, 15, 131, 13, 201, 95, 96, 53, 194, 233, 7, 225, 140,
+  36, 103, 30, 69, 142, 8, 99, 37, 240, 21, 10, 23, 190, 6, 148, 247, 120, 234,
+  75, 0, 26, 197, 62, 94, 252, 219, 203, 117, 35, 11, 32, 57, 177, 33, 88, 237,
+  149, 56, 87, 174, 20, 125, 136, 171, 168, 68, 175, 74, 165, 71, 134, 139, 48,
+  27, 166, 77, 146, 158, 231, 83, 111, 229, 122, 60, 211, 133, 230, 220, 105,
+  92, 41, 55, 46, 245, 40, 244, 102, 143, 54, 65, 25, 63, 161, 1, 216, 80, 73,
+  209, 76, 132, 187, 208, 89, 18, 169, 200, 196, 135, 130, 116, 188, 159, 86,
+  164, 100, 109, 198, 173, 186, 3, 64, 52, 217, 226, 250, 124, 123, 5, 202, 38,
+  147, 118, 126, 255, 82, 85, 212, 207, 206, 59, 227, 47, 16, 58, 17, 182, 189,
+  28, 42, 223, 183, 170, 213, 119, 248, 152, 2, 44, 154, 163, 70, 221, 153, 101,
+  155, 167, 43, 172, 9, 129, 22, 39, 253, 19, 98, 108, 110, 79, 113, 224, 232,
+  178, 185, 112, 104, 218, 246, 97, 228, 251, 34, 242, 193, 238, 210, 144, 12,
+  191, 179, 162, 241, 81, 51, 145, 235, 249, 14, 239, 107, 49, 192, 214, 31,
+  181, 199, 106, 157, 184, 84, 204, 176, 115, 121, 50, 45, 127, 4, 150, 254,
+  138, 236, 205, 93, 222, 114, 67, 29, 24, 72, 243, 141, 128, 195, 78, 66, 215,
+  61, 156, 180,
+]);
+const perm = new Uint8Array([...SIMPLEX_PERMUTATION, ...SIMPLEX_PERMUTATION]);
+const gradients = [
+  [1, 1, 0],
+  [-1, 1, 0],
+  [1, -1, 0],
+  [-1, -1, 0],
+  [1, 0, 1],
+  [-1, 0, 1],
+  [1, 0, -1],
+  [-1, 0, -1],
+  [0, 1, 1],
+  [0, -1, 1],
+  [0, 1, -1],
+  [0, -1, -1],
+];
+// Shared with render-kernel.ts: the wasm noise batch copies this table into
+// its own memory, so its simplex3 port reads exactly these values.
+export const SIMPLEX_GRADIENTS = gradients;
+function corner(x: number, y: number, z: number, index: number) {
+  const t = 0.6 - x * x - y * y - z * z;
+  if (t < 0) return 0;
+  const g = gradients[index % 12];
+  // Keep the original accumulation order (including the y-before-x dot product).
+  return (g[1] * y + g[0] * x + g[2] * z) * t * t * t * t;
+}
+export function simplex3(x: number, y: number, z: number) {
+  const s = (x + y + z) * (1 / 3);
+  const i = Math.floor(x + s);
+  const j = Math.floor(y + s);
+  const k = Math.floor(z + s);
+  const t = (i + j + k) * (1 / 6);
+  const x0 = x - (i - t);
+  const y0 = y - (j - t);
+  const z0 = z - (k - t);
+  let i1 = 0, j1 = 0, k1 = 0;
+  let i2 = 0, j2 = 0, k2 = 0;
+  if (x0 >= y0) {
+    if (y0 >= z0) {
+      i1 = 1;
+      i2 = 1;
+      j2 = 1;
+    } else if (x0 >= z0) {
+      i1 = 1;
+      i2 = 1;
+      k2 = 1;
+    } else {
+      k1 = 1;
+      i2 = 1;
+      k2 = 1;
+    }
+  } else {
+    if (y0 < z0) {
+      k1 = 1;
+      j2 = 1;
+      k2 = 1;
+    } else if (x0 < z0) {
+      j1 = 1;
+      j2 = 1;
+      k2 = 1;
+    } else {
+      j1 = 1;
+      i2 = 1;
+      j2 = 1;
+    }
+  }
+  const ii = i & 255,
+    jj = j & 255,
+    kk = k & 255;
+  const n0 = corner(x0, y0, z0, perm[ii + perm[jj + perm[kk]]]);
+  const n1 = corner(
+    x0 - i1 + 1 / 6,
+    y0 - j1 + 1 / 6,
+    z0 - k1 + 1 / 6,
+    perm[ii + i1 + perm[jj + j1 + perm[kk + k1]]],
+  );
+  const n2 = corner(
+    x0 - i2 + 1 / 3,
+    y0 - j2 + 1 / 3,
+    z0 - k2 + 1 / 3,
+    perm[ii + i2 + perm[jj + j2 + perm[kk + k2]]],
+  );
+  const n3 = corner(
+    x0 - 1 + 0.5,
+    y0 - 1 + 0.5,
+    z0 - 1 + 0.5,
+    perm[ii + 1 + perm[jj + 1 + perm[kk + 1]]],
+  );
+  return (n1 + n0 + n2 + n3) * 32;
+}
+
+// 0x008720c0. JS bitwise operations deliberately wrap to 32 bits.
+export function coordinateHash(a: number, b: number, c: number) {
+  a = ((a - b - c) ^ (c >>> 13)) >>> 0;
+  b = ((b - a - c) ^ (a << 8)) >>> 0;
+  c = ((c - a - b) ^ (b >>> 13)) >>> 0;
+  a = ((a - b - c) ^ (c >>> 12)) >>> 0;
+  b = ((b - a - c) ^ (a << 16)) >>> 0;
+  c = ((c - a - b) ^ (b >>> 5)) >>> 0;
+  a = ((a - b - c) ^ (c >>> 3)) >>> 0;
+  b = ((b - a - c) ^ (a << 10)) >>> 0;
+  return ((c - a - b) ^ (b >>> 15)) >>> 0;
+}
+export class NoitaRandom {
+  declare state: number;
+  constructor(state = 1) {
+    this.state = state;
+  }
+  next() {
+    this.state = (Math.trunc(this.state) * 16807) % 2147483647;
+    if (this.state < 1) this.state += 2147483647;
+    return this.state;
+  }
+  integer(min: number, max: number) {
+    return min + Math.trunc((max - min + 1) * this.next() * RNG_SCALE);
+  }
+  float(min: number, max: number) {
+    return Math.fround(Math.fround(Math.fround(this.next() * RNG_SCALE) * Math.fround(Math.fround(max) - Math.fround(min))) + Math.fround(min));
+  }
+  seed(x: number, y: number, worldSeed: number) {
+    worldSeed >>>= 0;
+    const salt = (worldSeed ^ 0x93262e6f) >>> 0;
+    x += salt & 0xfff;
+    y += (salt >>> 12) & 0xfff;
+    const a = Math.trunc(x * 134217727) >>> 0;
+    const b =
+      Math.trunc(
+        Math.abs(y) < 102400 && Math.abs(x) > 1
+          ? (y * 3483.328 + a) * y
+          : y * 134217727,
+      ) >>> 0;
+    this.state =
+      (coordinateHash(a, b, worldSeed) / 4294967295) * 2147483639 + 1;
+    if (this.state >= 2147483647) this.state *= 0.5;
+    this.next();
+    for (let i = worldSeed & 3; i > 0; i--) this.next();
+    return this;
+  }
+}
+
+export function proceduralRandomi(x: number, y: number, min: number, max: number, worldSeed = 0) {
+  return new NoitaRandom().seed(x, y, worldSeed).integer(min, max);
+}
+
+export class EmissionRandom {
+  declare state: number;
+  constructor(state = 1) {
+    this.state = state >>> 0;
+  }
+  next() {
+    this.state = (Math.imul(this.state, 214013) + 2531011) >>> 0;
+    return (this.state >>> 16) & 32767;
+  }
+  unit() {
+    return Math.fround(this.next() / 32767);
+  }
+  range(min: number, max: number) {
+    return Math.fround(Math.fround(this.unit() * Math.fround(Math.fround(max) - Math.fround(min))) + Math.fround(min));
+  }
+}
+
+// Lua doubles, then EntitySetTransform's float conversion.
+// The odd fixed-vertex modulo FIVE, one-based random argument, and inverted lerp are intentional.
+export function meditationPoints(frame: number, worldSeed = 0, x = 0, y = 0, period = 0): V2[] {
+  const verts: [number, number, number][] = [
+    [1, 0, 1],
+    [-1, 0, 1],
+    [1, 0, -1],
+    [-1, 0, -1],
+    [0, 1, 0],
+    [0, -1, 0],
+  ];
+  const ry = loopAngle(frame, 0.00613, period);
+  const rx = Math.sin(loopAngle(frame, 0.002, period)) * 0.3;
+  const sy = Math.sin(ry),
+    cy = Math.cos(ry),
+    sx = Math.sin(rx),
+    cx = Math.cos(rx);
+  for (const v of verts) {
+    const [vx, vy, vz] = v;
+    v[0] = vx * cy - vz * sy;
+    const z1 = vz * cy + vx * sy;
+    v[1] = vy * cx - z1 * sx;
+  }
+  const weight = frame % 2;
+  return Array.from({ length: 8 }, (_, i) => {
+    const a = verts[i % (verts.length - 1)];
+    const b = verts[proceduralRandomi(frame, i + 1, 0, 5, worldSeed)];
+    return {
+      x: Math.fround((a[0] * weight + b[0] * (1 - weight)) * 50 + x),
+      y: Math.fround((a[1] * weight + b[1] * (1 - weight)) * 50 + y),
+    };
+  });
+}
+
+// teleport_hourglass_return.lua: rotation is intentionally applied TWICE.
+export function hourglassEmitters(frame: number, x = 0, y = 0, period = 0) {
+  const rotation =
+    loopAngle(frame, 0.003, period) +
+    Math.sin(loopAngle(frame, 0.02, period)) * 0.6 +
+    Math.sin(loopAngle(frame, 0.012217, period)) * 0.7;
+  const weight = (Math.sin(loopAngle(frame, 0.004, period)) + 1) * 0.5;
+  const offset = Math.fround(2 * weight - 120 * (1 - weight));
+  return Array.from({ length: 9 }, (_, i) => {
+    const angle = Math.fround(rotation * 2 + ((Math.PI * 2) / 9) * (i + 1));
+    const c = Math.fround(Math.cos(angle)),
+      s = Math.fround(Math.sin(angle));
+    return { x: Math.fround(x - Math.fround(s * offset)), y: Math.fround(y + Math.fround(c * offset)), angle };
+  });
+}
+
+// 0x00713e20, no collision/attractor branch. Velocities are pixels/SECOND.
+export function stepParticle(p: Particle, time: number, dt = DT) {
+  p.age++;
+  const nx = Math.fround(p.x + Math.fround(p.vx * dt)),
+    ny = Math.fround(p.y + Math.fround(p.vy * dt));
+  p.alpha = Math.min(1, Math.max(0, Math.fround(p.alpha + Math.fround(p.fadeRate * dt))));
+  if ((p.attractor ?? 0) > 0) {
+    p.vx = Math.fround(p.vx + Math.fround(Math.fround(Math.fround((p.targetX ?? 0) - p.x) * dt) * p.attractor!));
+    p.vy = Math.fround(p.vy + Math.fround(Math.fround(Math.fround((p.targetY ?? 0) - p.y) * dt) * p.attractor!));
+  }
+  p.vx = Math.fround(p.vx + Math.fround(p.gx * dt));
+  p.vy = Math.fround(p.vy + Math.fround(p.gy * dt));
+  if (p.airflowForce > 0) {
+    const angle = Math.fround(
+      Math.fround(simplex3(Math.fround(nx * p.airflowScale), Math.fround(ny * p.airflowScale), time)) *
+        Math.fround(Math.PI),
+    );
+    const c = Math.fround(Math.cos(angle)),
+      s = Math.fround(Math.sin(angle));
+    p.vx = Math.fround(p.vx + Math.fround(Math.fround(c * 0) - Math.fround(s * p.airflowForce)));
+    p.vy = Math.fround(Math.fround(Math.fround(c * p.airflowForce) + Math.fround(s * 0)) + p.vy);
+  }
+  if (p.friction !== 0) {
+    p.vx = Math.fround(p.vx - Math.fround(Math.fround(p.vx * p.friction) * dt));
+    p.vy = Math.fround(p.vy - Math.fround(Math.fround(p.vy * p.friction) * dt));
+  }
+  p.life = Math.fround(p.life - dt);
+  const speed = Math.fround(Math.sqrt(Math.fround(Math.fround(p.vx * p.vx) + Math.fround(p.vy * p.vy))));
+  const dx = Math.fround(p.x - nx),
+    dy = Math.fround(p.y - ny);
+  const distance = Math.fround(Math.sqrt(Math.fround(Math.fround(dx * dx) + Math.fround(dy * dy))));
+  const tx = distance > 0 ? Math.fround(dx / distance) : 0,
+    ty = distance > 0 ? Math.fround(dy / distance) : 0;
+  p.x = nx;
+  p.y = ny;
+  p.prevX = Math.fround(Math.fround(Math.fround(tx * speed) * dt) + nx);
+  p.prevY = Math.fround(ny + Math.fround(Math.fround(ty * speed) * dt));
+  return p.life >= 0;
+}
+
+// Fast-path trig: 16384-step sin table for the per-particle airflow (the only
+// Math.sin/cos pair in the hot loop). cos(a) = sin(a + π/2) from the same
+// table. Indexing biases by 2³⁰ so the ToInt32 in the &-mask floors a
+// positive value (exact truncation = floor), wrapping via power-of-two mask;
+// the +¼ table for cos stays within the appended quarter. Max lookup error is
+// one table step ≈ 3.8e-4 rad → force error ≤ 1e-4 world units/frame;
+// scripts/render-diff.ts gates bound the resulting drift (measured worst
+// mean |ΔRGB| 0.017, p99.9 0, 0.03 % differing pixels over 600 preview
+// frames — an order of magnitude inside every gate).
+const SIN_LUT_STEPS = 16384;
+const SIN_LUT_MASK = SIN_LUT_STEPS - 1;
+const SIN_LUT_QUARTER = SIN_LUT_STEPS / 4;
+const SIN_LUT_TO_INDEX = SIN_LUT_STEPS / (2 * Math.PI);
+const SIN_LUT_BIAS = 0x40000000; // 2³⁰: keeps the masked ToInt32 flooring
+const SIN_LUT = new Float64Array(SIN_LUT_STEPS + SIN_LUT_QUARTER + 1);
+for (let i = 0; i < SIN_LUT.length; i++)
+  SIN_LUT[i] = Math.sin((i * 2 * Math.PI) / SIN_LUT_STEPS);
+
+// Float64 twin of stepParticle for the opt-in fastParticles path
+// (SimulationOptions): same branch structure and field updates — with every
+// Math.fround dropped and the per-particle constant flags
+// (friction, attractor, airflowForce) read once instead of inside the
+// expression tree. The common portal profile (friction 0, no attractor,
+// airflow on — every particle the portal emitters produce) runs in one
+// specialized branch with three render-invisible shortcuts: the airflow
+// sincos pair comes from SIN_LUT (bounded drift, gates above), the alpha
+// clamp is skipped when fadeRate is 0 (alpha then never changes; every emit
+// starts inside [0,1]), and the prevX/prevY stroke bookkeeping runs only for
+// drawLong particles (particleQuad — its only reader — touches prev only in
+// the drawLong branch). Purely numeric: it calls no RNG and touches no
+// emission state, so RNG streams, emission counts and lifetimes are
+// identical to stepParticle; positions/velocities drift within the bounds
+// enforced by scripts/render-diff.ts. The fround stepParticle above stays
+// the byte-exact reference for every other consumer.
+// `airflow` optionally carries the precomputed raw simplex3 value for this
+// particle (the wasm batch in advanceParticles evaluates the staged pool in
+// one call, from this same pre-step state — bit-identical to the inline
+// call); undefined evaluates the noise inline.
+export function stepParticleFast(p: Particle, time: number, dt = DT, airflow?: number) {
+  p.age++;
+  const airflowForce = p.airflowForce,
+    friction = p.friction,
+    attractor = p.attractor ?? 0;
+  if (airflowForce > 0 && friction === 0 && attractor <= 0) {
+    // Common profile, one branch: friction 0, no attractor, airflow on.
+    const airflowScale = p.airflowScale;
+    const nx = p.x + p.vx * dt,
+      ny = p.y + p.vy * dt;
+    const angle =
+      (airflow ?? simplex3(nx * airflowScale, ny * airflowScale, time)) * Math.PI;
+    // fadeRate 0 never changes alpha (emissions start inside [0,1]), so the
+    // clamped rewrite is a no-op worth skipping on the hot path.
+    if (p.fadeRate !== 0)
+      p.alpha = Math.min(1, Math.max(0, p.alpha + p.fadeRate * dt));
+    p.vx += p.gx * dt;
+    p.vy += p.gy * dt;
+    const k = angle * SIN_LUT_TO_INDEX + SIN_LUT_BIAS;
+    p.vx -= SIN_LUT[k & SIN_LUT_MASK] * airflowForce;
+    p.vy += SIN_LUT[(k + SIN_LUT_QUARTER) & SIN_LUT_MASK] * airflowForce;
+    p.life -= dt;
+    p.x = nx;
+    p.y = ny;
+    if (p.drawLong) {
+      // Stroke bookkeeping; only drawLong quads (particleQuad's drawLong
+      // branch) ever read prevX/prevY, so skipping it elsewhere is
+      // output-invariant.
+      const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy),
+        dx = p.x - nx,
+        dy = p.y - ny,
+        distance = Math.sqrt(dx * dx + dy * dy),
+        tx = distance > 0 ? dx / distance : 0,
+        ty = distance > 0 ? dy / distance : 0;
+      p.prevX = tx * speed * dt + nx;
+      p.prevY = ny + ty * speed * dt;
+    }
+    return p.life >= 0;
+  }
+  const nx = p.x + p.vx * dt,
+    ny = p.y + p.vy * dt;
+  p.alpha = Math.min(1, Math.max(0, p.alpha + p.fadeRate * dt));
+  if (attractor > 0) {
+    p.vx += ((p.targetX ?? 0) - p.x) * dt * attractor;
+    p.vy += ((p.targetY ?? 0) - p.y) * dt * attractor;
+  }
+  p.vx += p.gx * dt;
+  p.vy += p.gy * dt;
+  if (airflowForce > 0) {
+    const angle =
+      (airflow ?? simplex3(nx * p.airflowScale, ny * p.airflowScale, time)) * Math.PI;
+    const s = Math.sin(angle);
+    p.vx -= s * airflowForce;
+    p.vy += Math.cos(angle) * airflowForce;
+  }
+  if (friction !== 0) {
+    p.vx -= p.vx * friction * dt;
+    p.vy -= p.vy * friction * dt;
+  }
+  p.life -= dt;
+  const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy),
+    dx = p.x - nx,
+    dy = p.y - ny,
+    distance = Math.sqrt(dx * dx + dy * dy),
+    tx = distance > 0 ? dx / distance : 0,
+    ty = distance > 0 ? dy / distance : 0;
+  p.x = nx;
+  p.y = ny;
+  p.prevX = tx * speed * dt + nx;
+  p.prevY = ny + ty * speed * dt;
+  return p.life >= 0;
+}
+
+// XML parameters, not fitted constants. airflow_time exists in XML but this
+// executable does not copy it to grid::Particle (0x00bc86e0).
+const ring = Object.freeze({
+  count: 115,
+  interval: 12,
+  radiusMin: 15,
+  radiusMax: 15,
+  speed: 11,
+  lifeMin: 3,
+  lifeMax: 4,
+  fade: false,
+  force: Math.fround(0.051),
+  scale: Math.fround(0.03),
+});
+const mote = Object.freeze({
+  ...ring,
+  count: 1,
+  radiusMin: 0,
+  speed: 0,
+  fade: true,
+});
+const trail = Object.freeze({
+  count: 1,
+  interval: 1,
+  radiusMin: 0,
+  radiusMax: 0,
+  speed: 0,
+  lifeMin: 0.35,
+  lifeMax: 2.55,
+  fade: true,
+  force: Math.fround(0.251),
+  scale: Math.fround(0.03),
+});
+const eyeRing = Object.freeze({
+  ...ring,
+  interval: 24,
+  lifeMin: 1,
+  lifeMax: 7,
+  force: Math.fround(0.011),
+});
+const orbital = Object.freeze({
+  ...trail,
+  lifeMin: 10,
+  lifeMax: 20,
+  fade: false,
+  force: Math.fround(0.02),
+  velocityY: 60,
+  drawLong: true,
+});
+export const PORTAL_EMITTERS = Object.freeze({
+  ring,
+  mote,
+  trail,
+  eyeRing,
+  orbital,
+});
+function roundedCell(x: number) {
+  return Math.floor(Math.fround(x + (x >= 0 ? 0.5 : -0.5)));
+}
+
+// 0x00711750 / 0x007113e0. Native points are quads, not GL_POINTS.
+export function particleQuad(p: Particle) {
+  const wide =
+    !p.drawLong &&
+    p.singleWidth === false &&
+    (p.cellType === "gas" || p.cellType === "fire");
+  const alpha =
+    (Math.trunc(
+      Math.fround(
+        Math.fround(p.alpha * (p.drawLong && p.life < 1 ? p.life : wide ? 0.5 : 1)) * 255,
+      ),
+    ) &
+      255) /
+    255;
+  if (!p.drawLong) {
+    const width = wide ? 2 : 1;
+    return {
+      x: Math.fround((p.onGrid === false ? p.x : roundedCell(Math.fround(p.x + 0.5))) - width),
+      y: Math.fround((p.onGrid === false ? p.y : roundedCell(Math.fround(p.y + 0.5))) - 1),
+      cosine: 1,
+      sine: 0,
+      length: width,
+      alpha,
+    };
+  }
+  const dx = Math.fround(p.x - p.prevX),
+    dy = Math.fround(p.y - p.prevY);
+  const distance = Math.fround(Math.sqrt(Math.fround(Math.fround(dx * dx) + Math.fround(dy * dy))));
+  const length = Math.min(Math.fround(distance + 1), 12);
+  const angle =
+    distance === 0 ? 0 : Math.fround(Math.atan2(Math.fround(dy / distance), Math.fround(dx / distance)));
+  return {
+    x: Math.fround((p.onGrid === false ? p.x : Math.trunc(Math.fround(p.x + 0.5))) - 1),
+    y: Math.fround((p.onGrid === false ? p.y : Math.trunc(Math.fround(p.y + 0.5))) - 1),
+    cosine: Math.fround(Math.cos(angle)),
+    sine: Math.fround(Math.sin(angle)),
+    length,
+    alpha,
+  };
+}
+
+// 0x00711db0 / 0x00711960. gfx_glow selects the glow particle pool; it is
+// NOT a per-particle RGB multiplier here. Vertex alpha is packed to 8 bits.
+export function particleGlowQuad(p: Particle) {
+  const alpha = Math.fround(p.alpha * (p.life < 1 ? p.life : 1));
+  const brightness = p.ultrabright ? (p.drawLong ? 3 : 50) : 1;
+  const packedAlpha =
+    (Math.trunc(
+      Math.fround(Math.fround(Math.fround(alpha * Math.fround(p.drawLong ? 0.2 : 0.03)) * brightness) * 255),
+    ) &
+      255) /
+    255;
+  if (!p.drawLong)
+    return {
+      x: Math.fround((p.onGrid === false ? p.x : Math.trunc(Math.fround(p.x + 0.5))) - 12),
+      y: Math.fround((p.onGrid === false ? p.y : Math.trunc(Math.fround(p.y + 0.5))) - 12),
+      cosine: 1,
+      sine: 0,
+      length: 24,
+      height: 24,
+      alpha: packedAlpha,
+    };
+  const q = particleQuad(p);
+  const low = Math.fround(Math.fround(q.length + 16) * -0.5),
+    high = Math.fround(Math.fround(Math.fround(q.length + 16) + q.length) * 0.5);
+  return {
+    x: Math.fround(q.x + Math.fround(Math.fround(q.cosine * low) - Math.fround(q.sine * -8))),
+    y: Math.fround(q.y + Math.fround(Math.fround(q.sine * low) + Math.fround(q.cosine * -8))),
+    cosine: q.cosine,
+    sine: q.sine,
+    length: Math.fround(high - low),
+    height: 16,
+    alpha: packedAlpha,
+    anchorX: q.x,
+    anchorY: q.y,
+    lowX: low,
+    highX: high,
+    lowY: -8,
+    highY: 8,
+  };
+}
+
+// Keep each world-space corner's float operation order; rebuilding the high
+// corners from a rounded lower corner introduces measurable errors far from 0.
+export function writeParticleVertices(p: Particle, glow: boolean, out: Float32Array) {
+  const q: ParticleQuad = glow ? particleGlowQuad(p) : particleQuad(p);
+  const x = q.anchorX ?? q.x,
+    y = q.anchorY ?? q.y,
+    l = q.lowX ?? 0,
+    r = q.highX ?? q.length,
+    t = q.lowY ?? 0,
+    b = q.highY ?? q.height ?? 1,
+    c = q.cosine,
+    s = q.sine;
+  out[0] = Math.fround(x + Math.fround(Math.fround(c * l) - Math.fround(s * t)));
+  out[1] = Math.fround(y + Math.fround(Math.fround(s * l) + Math.fround(c * t)));
+  out[2] = Math.fround(x + Math.fround(Math.fround(c * r) - Math.fround(s * t)));
+  out[3] = Math.fround(y + Math.fround(Math.fround(s * r) + Math.fround(c * t)));
+  out[4] = Math.fround(x + Math.fround(Math.fround(c * r) - Math.fround(s * b)));
+  out[5] = Math.fround(y + Math.fround(Math.fround(s * r) + Math.fround(c * b)));
+  out[6] = Math.fround(x + Math.fround(Math.fround(c * l) - Math.fround(s * b)));
+  out[7] = Math.fround(y + Math.fround(Math.fround(s * l) + Math.fround(c * b)));
+  return q.alpha;
+}
+export function particleVertices(p: Particle, glow = false) {
+  const out = new Float32Array(8),
+    alpha = writeParticleVertices(p, glow, out);
+  return {
+    corners: [
+      [out[0], out[1]],
+      [out[2], out[3]],
+      [out[4], out[5]],
+      [out[6], out[7]],
+    ],
+    alpha,
+  };
+}
+
+export type SimulationFactory = (
+  options: SimulationOptions,
+  catalog: Catalog,
+  resources: Resources,
+) => PortalSimulation;
+// Optional capabilities only the math and image simulations implement.
+export type TrailScalableSimulation = PortalSimulation & {
+  setTrailScale?: (value?: number) => void;
+};
+export type ImageSettableSimulation = PortalSimulation & {
+  setImageSettings?: (settings: unknown) => void;
+};
+export class PortalSimulation {
+  declare effect: string;
+  declare retainInvisible: boolean;
+  declare emissionRng: EmissionRandom;
+  declare lifetimeRng: NoitaRandom;
+  declare particles: Particle[];
+  declare visibleCount: number;
+  declare points: (V2 & {angle?: number})[];
+  declare previousPoints: TrailPoint[];
+  declare dropped: number;
+  declare x: number;
+  declare y: number;
+  declare totalEmitted: number;
+  declare elapsedFrames: number;
+  declare frame: number;
+  declare startFrame: number;
+  declare worldSeed: number;
+  declare loopFrames: number;
+  declare time: number;
+  declare initialTime: number;
+  // Emission density multiplier (SimulationOptions.density). 1 = the ported
+  // game behavior; scaled views pass their world→pixel scale so on-screen
+  // particle density matches one cell = one pixel.
+  declare density: number;
+  // Presentation-only opt-out (SimulationOptions.ambientRing) for the ambient
+  // ring halo; default true keeps the ported emission.
+  declare ambientRing: boolean;
+  // Opt-in float64 particle integration (SimulationOptions.fastParticles);
+  // default false keeps the byte-exact fround reference.
+  declare fastParticles: boolean;
+  // Opt-in drop of never-visible particles (SimulationOptions.cullInvisible);
+  // default false keeps the native retention semantics.
+  declare cullInvisible: boolean;
+  // Opt-in SoA staging mirror (SimulationOptions.particleMirror): flat columns
+  // rebuilt at the end of every advanceParticles in pool order for the
+  // renderer's wasm blend kernel. Pure staging — the pool, motion, RNG and
+  // rendering are identical with or without it. The drawLong count is the
+  // defensive tripwire that keeps drawLong particles on the JS render path
+  // (the kernel does not rasterize their long segments).
+  declare particleMirror: boolean;
+  declare mirrorXs: Float64Array;
+  declare mirrorYs: Float64Array;
+  declare mirrorAs: Float64Array;
+  declare mirrorMeta: Uint32Array;
+  declare mirrorN: number;
+  declare mirrorDrawLong: number;
+  // Opt-in wasm airflow batch (ViewerRuntime.restart wires it when the render
+  // kernel module is loaded): evaluates the pool's simplex3 airflow noise in
+  // one call per advanceParticles, replacing one JS call per particle — the
+  // dominant per-step cost at fullscreen densities. Input columns are staged
+  // by stageMirror (see below); lanes past the staged prefix (particles
+  // emitted this frame) take the inline JS noise. Returns a view over kernel
+  // memory holding the raw f64 values in pool order, or null to keep the
+  // inline JS noise in stepParticleFast. Pure acceleration: the wasm port is
+  // bit-identical (src/render-kernel.test.ts pins the primitive and the full
+  // lockstep).
+  declare airflowBatch:
+    | ((ax: Float64Array, ay: Float64Array, n: number, time: number) => Float64Array)
+    | null;
+  declare noiseAx: Float64Array;
+  declare noiseAy: Float64Array;
+  // Optional surface of specialized simulations; the base class leaves them
+  // unset so polymorphic callers can probe which kind of body is running.
+  declare definition?: {sprites?: SpriteSpec[]; lifetime?: number};
+  declare emitters?: EmitterState[];
+  declare spriteEmitters?: SpriteEmitterState[];
+  declare spriteParticles?: SpriteParticle[];
+  declare emissionPoints?: EmissionPoint[];
+  declare settings?: ImageSettings;
+  declare imageOnce?: boolean;
+  declare trailEmission?: EmissionConfig;
+  declare guides?: Segments;
+  declare mathTrailScale?: number;
+  constructor(options: SimulationOptions = {}) {
+    this.reset(options);
+  }
+  reset({
+    effect = this.effect ?? "meditation",
+    worldSeed = 0,
+    x = 0,
+    y = 0,
+    startFrame = 0,
+    emissionSeed = 1,
+    lifetimeSeed = 1,
+    startTime = Math.fround(startFrame / 60),
+    retainInvisible = true,
+    density = this.density ?? 1,
+    minTrailLifetime = 0,
+    ambientRing = true,
+    fastParticles = false,
+    cullInvisible = false,
+    particleMirror = false,
+  }: SimulationOptions = {}) {
+    if (!Object.prototype.hasOwnProperty.call(EFFECTS, effect))
+      throw new RangeError("Unknown portal effect");
+    if (
+      ![
+        worldSeed,
+        x,
+        y,
+        startFrame,
+        emissionSeed,
+        lifetimeSeed,
+        startTime,
+        density,
+        minTrailLifetime,
+      ].every(Number.isFinite) ||
+      !Number.isSafeInteger(startFrame) ||
+      startFrame < 0 ||
+      startFrame > 100000000 ||
+      !Number.isInteger(worldSeed) ||
+      worldSeed < 0 ||
+      worldSeed > 0xffffffff ||
+      Math.abs(x) > 10000000 ||
+      Math.abs(y) > 10000000 ||
+      !Number.isInteger(emissionSeed) ||
+      emissionSeed < 0 ||
+      emissionSeed > 0xffffffff ||
+      !Number.isInteger(lifetimeSeed) ||
+      lifetimeSeed < 1 ||
+      lifetimeSeed >= 2147483647 ||
+      density <= 0
+    ) {
+      throw new RangeError("Invalid replay state");
+    }
+    Object.assign(this, {
+      effect,
+      worldSeed,
+      x: Math.fround(x),
+      y: Math.fround(y),
+      startFrame,
+      frame: startFrame,
+      time: Math.fround(startTime),
+      initialTime: Math.fround(startTime),
+      elapsedFrames: 0,
+      dropped: 0,
+      totalEmitted: 0,
+      density,
+      ambientRing,
+      fastParticles,
+      cullInvisible,
+      particleMirror,
+    });
+    // Authored presentation floor (meditation page); only ever lengthens the
+    // native trail, never shortens it.
+    this.trailEmission =
+      minTrailLifetime > trail.lifeMin
+        ? Object.freeze({ ...trail, lifeMin: minTrailLifetime })
+        : undefined;
+    this.retainInvisible = retainInvisible;
+    this.emissionRng = new EmissionRandom(emissionSeed);
+    this.lifetimeRng = new NoitaRandom(lifetimeSeed);
+    this.particles = [];
+    this.visibleCount = 0;
+    this.mirrorXs = new Float64Array(0);
+    this.mirrorYs = new Float64Array(0);
+    this.mirrorAs = new Float64Array(0);
+    this.mirrorMeta = new Uint32Array(0);
+    this.mirrorN = 0;
+    this.mirrorDrawLong = 0;
+    this.airflowBatch = null;
+    this.noiseAx = new Float64Array(0);
+    this.noiseAy = new Float64Array(0);
+    this.points = [];
+    this.previousPoints = Array.from({ length: 8 }, () => ({
+      x: this.x,
+      y: this.y,
+      cell: null,
+    }));
+  }
+  emit(config: EmissionConfig, x: number, y: number, angle = 0, previous: TrailPoint | null = null) {
+    if (this.particles.length >= MAX_PARTICLES) {
+      this.dropped++;
+      return;
+    }
+    // Even zero-width ranges consume rand() in the native emitter.
+    this.emissionRng.range(0, 0);
+    this.emissionRng.range(0, 0);
+    this.emissionRng.next(); // emission_chance (100%)
+    if (config.radiusMax > 0) {
+      const radius = Math.sqrt(this.emissionRng.unit()) * (config.radiusMax - config.radiusMin) + config.radiusMin;
+      const halfSector = 360 * 0.017453292 * 0.5;
+      const angle = this.emissionRng.range(-halfSector, halfSector);
+      x += Math.cos(angle) * radius;
+      y += Math.sin(angle) * radius;
+    }
+    // Trail pixel de-duplication occurs AFTER offset/chance RNG and BEFORE velocity RNG.
+    if (previous) {
+      // De-dup runs on density-scaled cells: sub-cell trail steps (density > 1)
+      // must not collapse onto one world cell, or scaled views lose the trail.
+      const cell = `${roundedCell(x * this.density)},${roundedCell(y * this.density)}`;
+      if (cell === previous.cell)
+        return;
+      previous.cell = cell;
+    }
+    const velocityY = this.emissionRng.range(
+      config.velocityY ?? 0,
+      config.velocityY ?? 0,
+    );
+    const velocityX = this.emissionRng.range(0, 0);
+    this.emissionRng.range(0, 0); // direction_random_deg
+    const dx = Math.fround(x - this.x),
+      dy = Math.fround(y - this.y);
+    const length = Math.fround(Math.sqrt(Math.fround(Math.fround(dx * dx) + Math.fround(dy * dy))));
+    const c = Math.fround(Math.cos(angle)),
+      sn = Math.fround(Math.sin(angle));
+    const radialX = length > 0 ? Math.fround(Math.fround(dx / length) * config.speed) : 0;
+    const radialY = length > 0 ? Math.fround(Math.fround(dy / length) * config.speed) : 0;
+    const vx = Math.fround(radialX + Math.fround(Math.fround(velocityX * c) - Math.fround(velocityY * sn)));
+    const vy = Math.fround(radialY + Math.fround(Math.fround(velocityX * sn) + Math.fround(velocityY * c)));
+    this.lifetimeRng.next(); // grid::Particle constructor's random call
+    const life = this.lifetimeRng.float(config.lifeMin, config.lifeMax);
+    this.lifetimeRng.integer(0, 100); // cosmetic-create draw; render_on_grid is subsequently overwritten
+    const drawLong = config.drawLong ?? false;
+    const onGrid = previous && this.density > 1 ? false : undefined;
+    this.particles.push({
+      x: Math.fround(x + 0.5),
+      y: Math.fround(y + 0.5),
+      prevX: Math.fround(x + 0.5),
+      prevY: Math.fround(y + 0.5),
+      vx,
+      vy,
+      gx: 0,
+      gy: 0,
+      friction: 0,
+      life,
+      maxLife: life,
+      age: 0,
+      alpha: SPARK.alpha,
+      fadeRate: config.fade ? Math.fround(-1 / life) : 0,
+      airflowForce: config.force,
+      airflowScale: config.scale,
+      drawLong,
+      // Scaled views emit sub-cell trail steps; snapping their quads back to
+      // world cells (the density-1 native rendering) re-quantizes the ~half
+      // pixel spacing into a coarse visible lattice. Only scaled views opt out.
+      onGrid,
+      // Precomputed kernel meta word: emit() sets no color (the purple
+      // fallback packs in) and wide needs cellType, absent here. See
+      // Particle.kernelMeta for the cache contract.
+      kernelMeta:
+        (((PARTICLE_PURPLE << 8) | (onGrid === false ? 1 : 0) | (drawLong ? 2 : 0)) >>>
+          0),
+    });
+    this.totalEmitted++;
+  }
+  emitBatch(config: EmissionConfig, x: number, y: number, angle = 0) {
+    this.emissionRng.range(0, 0);
+    this.emissionRng.range(0, 0); // per-batch offsets
+    // Density keeps emitted counts proportional to the view scale; at the
+    // default 1 this is exactly config.count (count is an integer).
+    const count = Math.ceil(config.count * this.density);
+    for (let i = 0; i < count; i++)
+      this.emit(config, x, y, angle);
+  }
+  emitTrail(previous: TrailPoint, current: V2, config: EmissionConfig = trail) {
+    const dx = current.x - previous.x;
+    const dy = current.y - previous.y;
+    // Density subdivides the path so trail dots stay ~1 screen px apart when a
+    // world cell spans several pixels (elsewhere they read as dashed lines).
+    const count = Math.ceil(Math.sqrt(dx * dx + dy * dy) * this.density);
+    this.emissionRng.range(0, 0);
+    this.emissionRng.range(0, 0); // batch setup runs even at count=0
+    if (count === 0)
+      return;
+    const sx = dx / count, sy = dy / count;
+    let x = previous.x, y = previous.y;
+    for (let i = 0; i < count; i++) {
+      this.emit(config, x, y, 0, previous);
+      x = x + sx;
+      y = y + sy;
+    }
+    previous.x = current.x;
+    previous.y = current.y;
+  }
+  step() {
+    // on-added schedules frame + interval - 1; subsequent intervals are 12.
+    const ambientRing = this.effect === "eye_room" ? eyeRing : ring;
+    if (
+      this.ambientRing &&
+      this.elapsedFrames % ambientRing.interval === ambientRing.interval - 1
+    )
+      this.emitBatch(ambientRing, this.x, this.y);
+    if (this.elapsedFrames % mote.interval === mote.interval - 1)
+      this.emitBatch(mote, this.x, this.y);
+    if (this.effect === "meditation") {
+      this.points = meditationPoints(
+        this.frame,
+        this.worldSeed,
+        this.x,
+        this.y,
+        this.loopFrames,
+      );
+      for (const [i, point] of this.points.entries()) {
+        this.emitTrail(this.previousPoints[i], point, this.trailEmission);
+      }
+    }
+    if (this.effect === "eye_room") {
+      this.points = hourglassEmitters(this.frame, this.x, this.y, this.loopFrames);
+      for (const point of this.points)
+        this.emitBatch(orbital, point.x, point.y, point.angle ?? 0);
+    }
+    this.advanceParticles();
+  }
+  advanceParticles() {
+    let write = 0,
+      visible = 0;
+    const fast = this.fastParticles,
+      particles = this.particles;
+    // The fast path evaluates the airflow noise for the staged pool in ONE
+    // call when a wasm batch is wired (the dominant per-step cost at
+    // fullscreen densities). stageMirror staged each survivor's noise input —
+    // (x + vx·DT)·scale from the post-advance state, exactly the pre-step
+    // state this loop's nx/ny would read — so the batch consumes flat columns
+    // with no separate pool scan. The staging prefix [0, mirrorN) maps 1:1
+    // onto this loop's `read` index: emissions only append past it, and
+    // compaction is stable. New particles (read ≥ mirrorN) and culled lanes
+    // (never stepped) take the inline JS noise / no noise at all.
+    let noise: Float64Array | null = null;
+    let stagedN = 0;
+    if (fast && this.airflowBatch && this.mirrorN > 0) {
+      stagedN = this.mirrorN;
+      noise = this.airflowBatch(this.noiseAx, this.noiseAy, stagedN, this.time);
+    }
+    // Indexed compaction: survivors only self-store when the write cursor has
+    // lagged (write === read index is already in place).
+    for (let read = 0; read < particles.length; read++) {
+      const p = particles[read];
+      if (!this.retainInvisible && p.alpha === 0 && p.fadeRate <= 0) {
+        // In the isolated air model these particles can never become visible or influence another.
+        // cullInvisible drops them outright — output-invariant (they render
+        // nothing, interact with nothing, consume no RNG) but pool size and
+        // age/lifetime bookkeeping then differ from the native retention.
+        // Without the flag: keep age/lifetime/capacity and all RNG calls
+        // intact; skip only unobservable motion.
+        if (!this.cullInvisible) {
+          p.age++;
+          // The fast path decrements in float64: the cull comparison may shift
+          // by an ulp-era frame, which the render-diff drift gates bound; the
+          // lifetime value itself (fixed at emission) is untouched.
+          p.life = fast ? p.life - DT : Math.fround(p.life - DT);
+          if (p.life >= 0) {
+            if (write !== read) particles[write] = p;
+            write++;
+          }
+        }
+      } else if (
+        fast
+          ? stepParticleFast(
+              p,
+              this.time,
+              DT,
+              noise !== null && read < stagedN ? noise[read] : undefined,
+            )
+          : stepParticle(p, this.time)
+      ) {
+        if (write !== read) particles[write] = p;
+        write++;
+        if (p.alpha > 0) visible++;
+      }
+    }
+    this.visibleCount = visible;
+    this.particles.length = write;
+    if (this.particleMirror) this.stageMirror();
+    else this.mirrorN = 0;
+    this.elapsedFrames++;
+    this.frame++;
+    this.time = Math.fround(this.time + DT);
+  }
+  // Pack the current pool (already compacted, render order = pool order) into
+  // the flat columns the wasm blend kernel walks. Meta word layout matches
+  // src/render-kernel.ts: bit0 onGrid === false, bit1 drawLong, bit2 wide
+  // (singleWidth === false && cellType gas/fire), bits 8-31 the packed color
+  // shifted so r sits at bits 24-31 — the kernel decodes r = (m >>> 24) & 255,
+  // g = (m >>> 16) & 255, b = (m >>> 8) & 255, and SoftwareRenderer.rgb
+  // decodes r = (packed >>> 16) & 255, so the shift maps one to the other.
+  // While here (fast path only) it also stages the NEXT step's airflow noise
+  // inputs: (x + vx·DT)·scale from this post-advance state is exactly the
+  // pre-step state the next advanceParticles would read, so the wasm noise
+  // batch needs no separate object-walking pass.
+  stageMirror() {
+    const particles = this.particles;
+    const n = particles.length;
+    let xs = this.mirrorXs,
+      ys = this.mirrorYs,
+      as = this.mirrorAs,
+      meta = this.mirrorMeta;
+    const need = n + 1; // +1: alpha-0 pad lane for the kernel's odd-n pair tail
+    if (xs.length < need) {
+      const cap = Math.max(need, xs.length * 2, 1024);
+      xs = this.mirrorXs = new Float64Array(cap);
+      ys = this.mirrorYs = new Float64Array(cap);
+      as = this.mirrorAs = new Float64Array(cap);
+      meta = this.mirrorMeta = new Uint32Array(cap);
+    }
+    let ax = this.noiseAx,
+      ay = this.noiseAy;
+    if (this.fastParticles && ax.length < n) {
+      const cap = Math.max(n, ax.length * 2, 1024);
+      ax = this.noiseAx = new Float64Array(cap);
+      ay = this.noiseAy = new Float64Array(cap);
+    }
+    const stageNoise = this.fastParticles;
+    let drawLong = 0;
+    for (let i = 0; i < n; i++) {
+      const p = particles[i]!;
+      xs[i] = p.x;
+      ys[i] = p.y;
+      as[i] = p.alpha;
+      if (stageNoise) {
+        ax[i] = (p.x + p.vx * DT) * p.airflowScale;
+        ay[i] = (p.y + p.vy * DT) * p.airflowScale;
+      }
+      // Meta inputs are immutable after emission except color/cellType
+      // (material-shifts, which resets the cache); portal-family particles
+      // arrive precomputed, others cache here on first staging.
+      let m = p.kernelMeta;
+      if (m === undefined) {
+        m = (p.color ?? PARTICLE_PURPLE) << 8;
+        if (p.onGrid === false) m |= 1;
+        if (p.drawLong) m |= 2;
+        if (
+          p.singleWidth === false &&
+          (p.cellType === "gas" || p.cellType === "fire")
+        )
+          m |= 4;
+        m = m >>> 0;
+        p.kernelMeta = m;
+      }
+      meta[i] = m;
+      // JS hands every drawLong particle with alpha > 0 to drawParticle —
+      // the kernel cannot reproduce those, so the renderer's gate needs the
+      // worst-case count (no margin cull: culling only reduces it).
+      if ((m & 2) !== 0 && p.alpha > 0) drawLong++;
+    }
+    // The kernel reads ceil(n/2) pairs; the pad lane dies on its alpha test.
+    as[n] = 0;
+    meta[n] = 0;
+    this.mirrorN = n;
+    this.mirrorDrawLong = drawLong;
+  }
+}
+
+// No simulation-frame skipping: bounded work per RAF, outstanding frames retained.
+export class FixedStepClock {
+  declare pending: number;
+  constructor() {
+    this.pending = 0;
+  }
+  reset() {
+    this.pending = 0;
+  }
+  advance(milliseconds: number, speed: number, step: () => void, maxSteps = 12) {
+    if (
+      !Number.isFinite(milliseconds) ||
+      milliseconds < 0 ||
+      !Number.isFinite(speed) ||
+      speed < 0
+    ) {
+      throw new RangeError("Invalid clock input");
+    }
+    this.pending += milliseconds * speed;
+    let count = 0;
+    while (this.pending + 1e-8 >= FRAME_MS && count < maxSteps) {
+      step();
+      this.pending -= FRAME_MS;
+      count++;
+    }
+    if (Math.abs(this.pending) < 1e-8) this.pending = 0;
+    return count;
+  }
+}

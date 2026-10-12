@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM", "DOM.Iterable", "WebWorker"],
+    "target": "ESNext",
+    "module": "Preserve",
+    "moduleDetection": "force",
+    "allowJs": true,
+    "checkJs": false,
+    // The sources were restored from the app's shipped JavaScript and are now
+    // fully annotated: strict mode is on, and `bun run lint` rejects `any`.
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "noFallthroughCasesInSwitch": true,
+    "types": ["bun"]
+  },
+  "include": ["src", "scripts"]
+}
