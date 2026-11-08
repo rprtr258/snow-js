@@ -92,6 +92,19 @@ const backgroundConfig = {
   position: "50% 50%",
   repeat: "no-repeat",
 };
+const defaultBackgroundConfig = {...backgroundConfig};
+function applyBackground() {
+  effectContainer.style.backgroundColor = backgroundConfig.color;
+  effectContainer.style.backgroundImage = backgroundConfig.image !== "" ? `url(${backgroundConfig.image})` : "none";
+  effectContainer.style.backgroundSize = backgroundConfig.size;
+  effectContainer.style.backgroundPosition = backgroundConfig.position;
+  effectContainer.style.backgroundRepeat = backgroundConfig.repeat;
+}
+function resetBackground() {
+  Object.assign(backgroundConfig, defaultBackgroundConfig);
+  applyBackground();
+  pane.refresh();
+}
 
 const snow = new Snow(effectContainer, commonOptions.speed, toInner(), false);
 snow.start();
@@ -104,6 +117,7 @@ const cardConfig = {
 /** active effect */
 const effectState: {effect: "snow" | "dust"} = {effect: "snow"};
 let dust: Dust | null = null;
+let dustBackgroundReset = false;
 
 /** dust options */
 const dustOptions = {
@@ -115,8 +129,6 @@ const dustOptions = {
   glow: dustDefaults.glow,
   useParticleColor: false,
   particleColor: "#ffffff",
-  useBackgroundColor: false,
-  backgroundColor: "#000000",
   mathTrailScale: dustDefaults.mathTrailScale,
   seed: dustDefaults.seed,
   worldX: dustDefaults.x,
@@ -135,7 +147,7 @@ function toDustOptions(): Partial<DustOptions> {
     core: dustOptions.core,
     glow: dustOptions.glow,
     color: dustOptions.useParticleColor ? dustOptions.particleColor : null,
-    background: dustOptions.useBackgroundColor ? dustOptions.backgroundColor : null,
+    background: backgroundConfig.color,
     mathTrailScale: dustOptions.mathTrailScale,
     seed: dustOptions.seed,
     x: dustOptions.worldX,
@@ -154,6 +166,12 @@ function activateDust() {
   snowFolder.hidden = true;
   dustFolder.hidden = false;
   if (!dust) {
+    // First pick: reset the shared background form so snow-time background
+    // choices don't bleed into dust's rendered background.
+    if (!dustBackgroundReset) {
+      resetBackground();
+      dustBackgroundReset = true;
+    }
     dust = new Dust(effectContainer, toDustOptions());
   }
   dust.start();
@@ -264,17 +282,6 @@ function rebuildDustControls() {
     dust?.update({color: value ? dustOptions.particleColor : null});
   });
 
-  const backgroundBinding = dustFolder.addBinding(dustOptions, "backgroundColor", {label: "background"});
-  backgroundBinding.hidden = !dustOptions.useBackgroundColor;
-  backgroundBinding.on("change", () => {
-    if (dustOptions.useBackgroundColor)
-      dust?.update({background: dustOptions.backgroundColor});
-  });
-  dustFolder.addBinding(dustOptions, "useBackgroundColor", {label: "custom background"}).on("change", ({value}) => {
-    backgroundBinding.hidden = !value;
-    dust?.update({background: value ? dustOptions.backgroundColor : null});
-  });
-
   const mathTrailBinding = dustFolder.addBinding(dustOptions, "mathTrailScale", {
     label: "trail scale",
     min: 0.5,
@@ -353,7 +360,11 @@ pane.on("change", (e) => {
 
 /** background */
 const background = pane.addFolder({title: "background", expanded: false});
-background.addBinding(backgroundConfig, "color").on("change", ({value}) => { effectContainer.style.backgroundColor = value; });
+background.addBinding(backgroundConfig, "color").on("change", ({value}) => {
+  effectContainer.style.backgroundColor = value;
+  if (dust)
+    dust.update({background: String(value)});
+});
 background.addBinding(backgroundConfig, "image").on("change", ({value}) => { effectContainer.style.backgroundImage = `url(${value})`; });
 background.addBinding(backgroundConfig, "size").on("change", ({value}) => { effectContainer.style.backgroundSize = value; });
 background.addBinding(backgroundConfig, "position").on("change", ({value}) => { effectContainer.style.backgroundPosition = value; });
