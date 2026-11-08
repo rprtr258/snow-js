@@ -3,6 +3,10 @@
 Browser renderer for Noita's portal/effect animations: a deterministic CPU
 rasterizer ported from the game's shipped JavaScript, plus GIF export.
 
+Dust lives inside the snow-js bun workspace (`packages/snow-js/dust`); the root
+lockfile manages its dependencies, and the snow-js website embeds it as a
+second background effect through `src/embed.ts`.
+
 ## Orientation
 
 **The ported code is the spec.** `src/` was restored from the shipped game JS
@@ -20,6 +24,12 @@ the only page.
 
 **`static/assets/` are game-shipped inputs** (`effects.bin`, `effects.json`,
 `raster.wasm`, `export-loops.json`); nothing in this repo generates them.
+
+**The embed boundary is hand-written.** `package.json` exports `./src/embed.ts`
+with a `types` condition pointing at `src/embed.d.ts` so consumers typecheck
+against that declaration only — the snow-js/website tsconfigs never pull the
+ported sources in (their stricter flags would reject them). Keep `embed.d.ts`
+in sync with `embed.ts` when changing the embed API.
 
 ## Invariants
 

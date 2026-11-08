@@ -1,9 +1,17 @@
 import {/*FolderApi, */Pane} from "tweakpane";
 import * as EssentialsPlugin from "@tweakpane/plugin-essentials";
 import {Snow, type Options} from "snow-js";
+import {
+  Dust,
+  dustDefaults,
+  dustEffectGroups,
+  type DustCollection,
+  type DustEffectGroup,
+  type DustOptions,
+} from "dust/src/embed.ts";
 
 const mainContainer = document.querySelector<HTMLDivElement>(".container")!;
-const snowContainer = document.querySelector<HTMLDivElement>(".snow-container")!;
+const effectContainer = document.querySelector<HTMLDivElement>(".effect-container")!;
 
 type RGB = [number, number, number];
 function parseHexColor(hex: string): RGB {
@@ -83,11 +91,73 @@ const backgroundConfig = {
   size: "cover",
   position: "50% 50%",
   repeat: "no-repeat",
-  showBanner: true,
 };
 
-const snow = new Snow(snowContainer, commonOptions.speed, toInner(), false);
+const snow = new Snow(effectContainer, commonOptions.speed, toInner(), false);
 snow.start();
+
+/** card */
+const cardConfig = {
+  show: true,
+};
+
+/** active effect */
+const effectState: {effect: "snow" | "dust"} = {effect: "snow"};
+let dust: Dust | null = null;
+
+/** dust options */
+const dustOptions = {
+  collection: dustDefaults.collection,
+  effect: dustDefaults.effect,
+  speed: dustDefaults.speed,
+  zoom: dustDefaults.zoom,
+  core: dustDefaults.core,
+  glow: dustDefaults.glow,
+  useParticleColor: false,
+  particleColor: "#ffffff",
+  useBackgroundColor: false,
+  backgroundColor: "#000000",
+  mathTrailScale: dustDefaults.mathTrailScale,
+  seed: dustDefaults.seed,
+  worldX: dustDefaults.x,
+  worldY: dustDefaults.y,
+};
+const defaultDustEffect: Record<DustCollection, string> = {
+  game: dustDefaults.effect,
+  math: "math_penrose",
+};
+function toDustOptions(): Partial<DustOptions> {
+  return {
+    collection: dustOptions.collection,
+    effect: dustOptions.effect,
+    speed: dustOptions.speed,
+    zoom: dustOptions.zoom,
+    core: dustOptions.core,
+    glow: dustOptions.glow,
+    color: dustOptions.useParticleColor ? dustOptions.particleColor : null,
+    background: dustOptions.useBackgroundColor ? dustOptions.backgroundColor : null,
+    mathTrailScale: dustOptions.mathTrailScale,
+    seed: dustOptions.seed,
+    x: dustOptions.worldX,
+    y: dustOptions.worldY,
+  };
+}
+function activateSnow() {
+  dust?.unmount();
+  dust = null;
+  snow.start();
+  snowFolder.hidden = false;
+  dustFolder.hidden = true;
+}
+function activateDust() {
+  snow.stop();
+  snowFolder.hidden = true;
+  dustFolder.hidden = false;
+  if (!dust) {
+    dust = new Dust(effectContainer, toDustOptions());
+  }
+  dust.start();
+}
 
 const pane = new Pane({
   document,
@@ -96,20 +166,154 @@ const pane = new Pane({
 });
 pane.registerPlugin(EssentialsPlugin);
 
-/** options */
-pane.addBinding(options, "isDark");
-pane.addBinding(options, "gradientIntensity", {min: 0, max: 1});
-pane.addBinding(options, "gradient");
-pane.addBinding(options, "amount", {min: 0.01, max: 0.5});
-pane.addBinding(options, "size", {min: 0.4, max: 2});
-pane.addBinding(options, "opacity", {min: 0.3, max: 3});
+pane.addBinding(cardConfig, "show", {label: "show card"}).on("change", ({value}) => {
+  mainContainer.style.display = value ? "block" : "none";
+});
 
-const common = pane.addFolder({title: "Common options", expanded: true});
-common.addBinding(commonOptions, "speed", {min: 0, max: 20});
-common.addBinding({get time(): number {return snow._time;}}, "time", {
+pane.addBinding(effectState, "effect", {
+  label: "effect",
+  options: {
+    "Snow": "snow",
+    "Dust": "dust",
+  },
+}).on("change", ({value}) => {
+  if (value === "snow") {
+    activateSnow();
+  } else {
+    activateDust();
+  }
+});
+
+/** snow options */
+const snowFolder = pane.addFolder({title: "snow", expanded: true});
+snowFolder.addBinding(options, "isDark");
+snowFolder.addBinding(options, "gradientIntensity", {min: 0, max: 1});
+snowFolder.addBinding(options, "gradient");
+snowFolder.addBinding(options, "amount", {min: 0.01, max: 0.5});
+snowFolder.addBinding(options, "size", {min: 0.4, max: 2});
+snowFolder.addBinding(options, "opacity", {min: 0.3, max: 3});
+snowFolder.addBinding(commonOptions, "speed", {min: 0, max: 20});
+snowFolder.addBinding({get time(): number {return snow._time;}}, "time", {
   view: "number",
   label: "time",
   readonly: true,
+});
+
+/** dust options */
+const dustFolder = pane.addFolder({title: "dust", expanded: true});
+dustFolder.hidden = true;
+
+let dustGroups: {game: DustEffectGroup[], math: DustEffectGroup[]} | null = null;
+// Tweakpane lists are flat (no optgroups), so group context is prefixed into
+// each label while values stay the raw effect keys.
+function effectListOptions(groups: DustEffectGroup[]): Record<string, string> {
+  const options: Record<string, string> = {};
+  for (const group of groups) {
+    for (const entry of group.effects)
+      options[`${group.label} · ${entry.label}`] = entry.key;
+  }
+  return options;
+}
+function rebuildDustControls() {
+  for (const child of [...dustFolder.children])
+    dustFolder.remove(child);
+  dustFolder.addBinding(dustOptions, "collection", {
+    label: "collection",
+    options: {
+      "Noita effects": "game",
+      "Mathematical figures · original": "math",
+    },
+  }).on("change", ({value}) => {
+    dustOptions.collection = value;
+    dustOptions.effect = defaultDustEffect[dustOptions.collection];
+    // The rebuild disposes the blade that fired this event; defer it past
+    // the dispatch so tweakpane never touches a disposed view.
+    setTimeout(rebuildDustControls, 0);
+    dust?.update({collection: dustOptions.collection, effect: dustOptions.effect});
+  });
+  const groups = dustOptions.collection === "math" ? dustGroups?.math : dustGroups?.game;
+  dustFolder.addBinding(dustOptions, "effect", {
+    label: "effect",
+    options: effectListOptions(groups ?? []),
+  }).on("change", ({value}) => {
+    dustOptions.effect = value;
+    dust?.update({effect: dustOptions.effect});
+  });
+
+  dustFolder.addBinding(dustOptions, "speed", {min: 0.25, max: 2}).on("change", () => {
+    dust?.update({speed: dustOptions.speed});
+  });
+  dustFolder.addBinding(dustOptions, "zoom", {min: 1, max: 10, step: 1}).on("change", () => {
+    dust?.update({zoom: dustOptions.zoom});
+  });
+  dustFolder.addBinding(dustOptions, "core", {label: "portal sprite"}).on("change", () => {
+    dust?.update({core: dustOptions.core});
+  });
+  dustFolder.addBinding(dustOptions, "glow").on("change", () => {
+    dust?.update({glow: dustOptions.glow});
+  });
+
+  const particleBinding = dustFolder.addBinding(dustOptions, "particleColor", {label: "particles"});
+  particleBinding.hidden = !dustOptions.useParticleColor;
+  particleBinding.on("change", () => {
+    if (dustOptions.useParticleColor)
+      dust?.update({color: dustOptions.particleColor});
+  });
+  dustFolder.addBinding(dustOptions, "useParticleColor", {label: "custom particles"}).on("change", ({value}) => {
+    particleBinding.hidden = !value;
+    dust?.update({color: value ? dustOptions.particleColor : null});
+  });
+
+  const backgroundBinding = dustFolder.addBinding(dustOptions, "backgroundColor", {label: "background"});
+  backgroundBinding.hidden = !dustOptions.useBackgroundColor;
+  backgroundBinding.on("change", () => {
+    if (dustOptions.useBackgroundColor)
+      dust?.update({background: dustOptions.backgroundColor});
+  });
+  dustFolder.addBinding(dustOptions, "useBackgroundColor", {label: "custom background"}).on("change", ({value}) => {
+    backgroundBinding.hidden = !value;
+    dust?.update({background: value ? dustOptions.backgroundColor : null});
+  });
+
+  const mathTrailBinding = dustFolder.addBinding(dustOptions, "mathTrailScale", {
+    label: "trail scale",
+    min: 0.5,
+    max: 3,
+    step: 0.1,
+  });
+  mathTrailBinding.hidden = dustOptions.collection !== "math";
+  mathTrailBinding.on("change", () => {
+    dust?.update({mathTrailScale: dustOptions.mathTrailScale});
+  });
+
+  dustFolder.addBinding(dustOptions, "seed", {min: 0, max: 0xffffffff, step: 1}).on("change", () => {
+    dust?.update({seed: dustOptions.seed});
+  });
+  dustFolder.addBinding(dustOptions, "worldX", {min: -1e7, max: 1e7}).on("change", () => {
+    dust?.update({x: dustOptions.worldX});
+  });
+  dustFolder.addBinding(dustOptions, "worldY", {min: -1e7, max: 1e7}).on("change", () => {
+    dust?.update({y: dustOptions.worldY});
+  });
+  dustFolder.addButton({title: "restart"}).on("click", () => {
+    dust?.restart();
+  });
+}
+rebuildDustControls();
+void dustEffectGroups().then((groups) => {
+  dustGroups = groups;
+  rebuildDustControls();
+});
+
+pane.on("change", (e) => {
+  void e;
+  // // @ts-expect-error sosi
+  // if (e.target.label === "preset")
+  //   rebuild();
+  if (effectState.effect !== "snow")
+    return;
+  snow.update(toInner());
+  snow.speed = commonOptions.speed;
 });
 
 // const varsFolder: FolderApi = pane.addFolder({title: "Configuration"});
@@ -146,23 +350,14 @@ common.addBinding({get time(): number {return snow._time;}}, "time", {
 // }
 
 // rebuild();
-pane.on("change", (e) => {
-  void e;
-  // // @ts-expect-error sosi
-  // if (e.target.label === "preset")
-  //   rebuild();
-  snow.update(toInner());
-  snow.speed = commonOptions.speed;
-});
 
 /** background */
 const background = pane.addFolder({title: "background", expanded: false});
-background.addBinding(backgroundConfig, "showBanner", {label: "show banner"}).on("change", ({value}) => { mainContainer.style.display = value ? "block" : "none"; });
-background.addBinding(backgroundConfig, "color").on("change", ({value}) => { snowContainer.style.backgroundColor = value; });
-background.addBinding(backgroundConfig, "image").on("change", ({value}) => { snowContainer.style.backgroundImage = `url(${value})`; });
-background.addBinding(backgroundConfig, "size").on("change", ({value}) => { snowContainer.style.backgroundSize = value; });
-background.addBinding(backgroundConfig, "position").on("change", ({value}) => { snowContainer.style.backgroundPosition = value; });
-background.addBinding(backgroundConfig, "repeat").on("change", ({value}) => { snowContainer.style.backgroundRepeat = value; });
+background.addBinding(backgroundConfig, "color").on("change", ({value}) => { effectContainer.style.backgroundColor = value; });
+background.addBinding(backgroundConfig, "image").on("change", ({value}) => { effectContainer.style.backgroundImage = `url(${value})`; });
+background.addBinding(backgroundConfig, "size").on("change", ({value}) => { effectContainer.style.backgroundSize = value; });
+background.addBinding(backgroundConfig, "position").on("change", ({value}) => { effectContainer.style.backgroundPosition = value; });
+background.addBinding(backgroundConfig, "repeat").on("change", ({value}) => { effectContainer.style.backgroundRepeat = value; });
 
 /** monitors */
 const monitors = pane.addFolder({title: "monitors", expanded: true});
@@ -187,14 +382,14 @@ document.addEventListener("keydown", (event) => {
   if (event.code === "F11") {
     event.preventDefault();
 
-    if (snowContainer.requestFullscreen !== undefined) {
-      void snowContainer.requestFullscreen();
-    } else if (snowContainer.webkitRequestFullscreen) {
-      snowContainer.webkitRequestFullscreen();
-    } else if (snowContainer.mozRequestFullScreen) {
-      snowContainer.mozRequestFullScreen();
-    } else if (snowContainer.msRequestFullscreen) {
-      snowContainer.msRequestFullscreen();
+    if (effectContainer.requestFullscreen !== undefined) {
+      void effectContainer.requestFullscreen();
+    } else if (effectContainer.webkitRequestFullscreen) {
+      effectContainer.webkitRequestFullscreen();
+    } else if (effectContainer.mozRequestFullScreen) {
+      effectContainer.mozRequestFullScreen();
+    } else if (effectContainer.msRequestFullscreen) {
+      effectContainer.msRequestFullscreen();
     }
   }
 });

@@ -69,7 +69,7 @@
       color: hsla(0, 0%, 70%, 1);
     }
 
-    .snow-container {
+    .effect-container {
       position: fixed;
       left: 0;
       top: 0;
@@ -79,6 +79,12 @@
       background-size: cover;
       background-position: 50% 50%;
       background-repeat: no-repeat;
+    }
+    /* Snow and dust canvases stack in the same fixed container. */
+    .effect-container canvas {
+      position: absolute;
+      left: 0;
+      top: 0;
     }
 
     :root {
@@ -116,7 +122,7 @@
       <span class="label">Visit on GitHub</span>
     </a>
   </div>
-  <div class="snow-container"></div>
+  <div class="effect-container"></div>
   <script type="module" src="./index.ts"></script>
 </body>
 

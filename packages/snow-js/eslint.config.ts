@@ -5,6 +5,10 @@ import importPlugin from "eslint-plugin-import";
 
 export default defineConfig([
   {
+    // dust/ is a separate strict project with its own tsconfig and eslint.
+    ignores: ["dust/**"],
+  },
+  {
     files: ["**/*.ts", "*.ts"],
     languageOptions: {
       parserOptions: {

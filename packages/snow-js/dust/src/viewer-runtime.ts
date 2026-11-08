@@ -93,12 +93,14 @@ export class ViewerRuntime {
     this.slow = false;
     this.cost = { simulation: 0, raster: 0 };
   }
-  setView({ width, height, centerX = 0, centerY = 0 }: {width: number; height: number; centerX?: number; centerY?: number}) {
+  setView({ width, height, centerX = 0, centerY = 0, scale }: {width: number; height: number; centerX?: number; centerY?: number; scale?: number}) {
     const old = this.renderer;
-    const changed = old.width !== width || old.height !== height || (old.centerX ?? 0) !== centerX || (old.centerY ?? 0) !== centerY;
-    if (old.width !== width || old.height !== height)
-      this.renderer = new SoftwareRenderer(width, height, this.resources, this.catalog, { kernelModule: this.kernelModule, renderKernelModule: this.renderKernelModule, scale: this.scale });
-    else if (changed) old.clear();
+    const nextScale = scale === undefined ? this.scale : scale;
+    const changed = old.width !== width || old.height !== height || (old.centerX ?? 0) !== centerX || (old.centerY ?? 0) !== centerY || old.scale !== nextScale;
+    if (old.width !== width || old.height !== height || old.scale !== nextScale) {
+      this.scale = nextScale;
+      this.renderer = new SoftwareRenderer(width, height, this.resources, this.catalog, { kernelModule: this.kernelModule, renderKernelModule: this.renderKernelModule, scale: nextScale });
+    } else if (changed) old.clear();
     Object.assign(this.renderer, { centerX, centerY });
   }
   restart(replay: SimulationOptions = {}, revision = 0, automatic = false) {

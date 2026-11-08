@@ -8,6 +8,7 @@
     "lint:fix": "eslint '**/*.{ts,json}' --fix"
   },
   "dependencies": {
+    "dust": "workspace:*",
     "snow-js": "workspace:*",
     "@tweakpane/plugin-essentials": "^0.2.1",
     "tweakpane": "^4.0.5",

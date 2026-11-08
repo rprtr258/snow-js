@@ -26,6 +26,16 @@ globalThis.onmessage = ({ data }) => {
         options: data.options,
         recycle: data.recycle,
       });
+    } else if (data.type === "view") {
+      runtime!.setView({
+        width: data.width!,
+        height: data.height!,
+        centerX: data.centerX,
+        centerY: data.centerY,
+        scale: data.scale,
+      });
+      // No frame response: the next frame request renders at the new view.
+      return;
     } else if (data.type === "frame") {
       if (data.revision !== runtime!.revision) {
         postMessage({ type: "frame", revision: runtime!.revision, stale: true });
