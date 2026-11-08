@@ -5,11 +5,14 @@ import importPlugin from "eslint-plugin-import";
 
 export default defineConfig([
   {
-    // dust/ is a separate strict project with its own tsconfig and eslint.
-    ignores: ["dust/**"],
+    ignores: ["**/dist/", "**/node_modules/"],
   },
   {
+    // snow-js sources: strict house style, type-checked against tsconfig.json.
+    // dust/ is a separate strict project (tsconfig.dust.json) with its own
+    // lighter ruleset below.
     files: ["**/*.ts", "*.ts"],
+    ignores: ["dust/**"],
     languageOptions: {
       parserOptions: {
         parser: tseslint.parser,
@@ -18,8 +21,13 @@ export default defineConfig([
       },
     },
   },
-  tseslint.configs.recommendedTypeChecked,
+  ...tseslint.configs.recommendedTypeChecked.map((config) => ({
+    ...config,
+    ignores: ["dust/**"],
+  })),
   {
+    files: ["**/*.ts", "*.ts"],
+    ignores: ["dust/**"],
     plugins: {
       "@stylistic": stylistic,
       import: importPlugin,
@@ -45,5 +53,13 @@ export default defineConfig([
         assertionStyle: "never",
       }],
     },
+  },
+  {
+    // dust: the ported sources are strictly typed, so an explicit `any` is a
+    // lint error; this is the only rule dust enforces for now.
+    files: ["dust/src/**/*.ts", "dust/scripts/**/*.ts"],
+    plugins: {"@typescript-eslint": tseslint.plugin},
+    languageOptions: {parser: tseslint.parser},
+    rules: {"@typescript-eslint/no-explicit-any": "error"},
   },
 ]);

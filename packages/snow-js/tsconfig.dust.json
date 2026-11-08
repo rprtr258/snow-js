@@ -14,5 +14,5 @@
     "noFallthroughCasesInSwitch": true,
     "types": ["bun"]
   },
-  "include": ["src", "scripts"]
+  "include": ["dust/src", "dust/scripts"]
 }

@@ -1,7 +1,7 @@
 {
   "name": "snow-js-workspace",
   "version": "0.0.0",
-  "workspaces": ["packages/*", "packages/snow-js/dust"],
+  "workspaces": ["packages/*"],
   "scripts": {
     "dev:website": "cd ./packages/website && bun dev",
     "lint": "cd ./packages/snow-js && bun lint && cd ../website && bun lint",

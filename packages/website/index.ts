@@ -8,7 +8,7 @@ import {
   type DustCollection,
   type DustEffectGroup,
   type DustOptions,
-} from "dust/src/embed.ts";
+} from "snow-js/dust/src/embed.ts";
 
 const mainContainer = document.querySelector<HTMLDivElement>(".container")!;
 const effectContainer = document.querySelector<HTMLDivElement>(".effect-container")!;
