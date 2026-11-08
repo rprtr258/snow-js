@@ -1,7 +1,7 @@
 import { findBodyLoop, movingBody } from "./gif-loop";
 import { PortalSimulation } from "./portal-physics";
 
-export type LoopMatch = [number, number, number];
+type LoopMatch = [number, number, number];
 export type LoopCatalog = {
   version: number;
   speeds: number[];
@@ -15,7 +15,7 @@ async function loopCatalog(): Promise<LoopCatalog | null> {
     .then(r => r.ok ? r.json() : null).catch(() => null);
   return catalogPromise;
 }
-export function lookupLoopPlan(
+function lookupLoopPlan(
   catalog: LoopCatalog | null,
   simulations: PortalSimulation[],
   origin: number,

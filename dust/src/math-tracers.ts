@@ -18,7 +18,7 @@ export type Tracer = {
   previous: Required<TrailPoint>;
 };
 
-export const MATH_TRACING = Object.freeze({
+const MATH_TRACING = Object.freeze({
   emitters: 8,
   minTravel: 24,
   maxTravel: 40,

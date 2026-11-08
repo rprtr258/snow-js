@@ -7,7 +7,7 @@ const modules = new Map<
   string,
   Promise<{module: CodecModule; defaultOptions: Record<string, unknown>}>
 >();
-export type CodecModule = {
+type CodecModule = {
   encode(
     input: Uint8Array,
     width: number,
@@ -60,7 +60,7 @@ export function canvasPNG(canvas: EncodeCanvas): Promise<Blob> {
 // Use a faster search for ordinary exports. A requested file cap retains the
 // compact settings, helping preserve dimensions before the fitting pass.
 // https://developers.google.com/speed/webp/docs/api#advanced_encoding_api
-export function webpLosslessOptions(compact = false) {
+function webpLosslessOptions(compact = false) {
   return { lossless: 1, quality: compact ? 100 : 25, method: compact ? 4 : 1,
     exact: 1, near_lossless: 100, alpha_quality: 100 };
 }

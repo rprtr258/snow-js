@@ -7,7 +7,7 @@ import { validateColor } from "./particle-color";
 import { FRAME_MS } from "./timing";
 import { Catalog, RawOptions, Resources, Size } from "./types";
 
-export const DEMO = Object.freeze({ width: 480, height: 320, build: 90, animate: 300, fade: 90, historyLimit: 128 });
+const DEMO = Object.freeze({ width: 480, height: 320, build: 90, animate: 300, fade: 90, historyLimit: 128 });
 export type FigureBounds = {x: number; y: number; width: number; height: number};
 export type DemoView_ = {
   width: number;
@@ -42,7 +42,7 @@ export type DemoFrameData = {
 };
 
 // The vivid HSL palette from the original grid demo.
-export function randomColor(random: () => number = Math.random) {
+function randomColor(random: () => number = Math.random) {
   const h = random(), s = 0.85, l = 0.6, a = s * Math.min(l, 1 - l);
   const channel = (n: number) => {
     const k = (n + h * 12) % 12;
@@ -99,7 +99,7 @@ export function figureBounds(
   return { x: (left + right) / 2, y: (top + bottom) / 2, width: Math.max(32, right - left), height: Math.max(32, bottom - top) };
 }
 
-export function fitFigure(bounds: FigureBounds, width: number, height: number) {
+function fitFigure(bounds: FigureBounds, width: number, height: number) {
   const scale = 0.9 * Math.min(width / bounds.width, height / bounds.height);
   return { scale, x: width / 2 - bounds.x * scale, y: height / 2 - bounds.y * scale };
 }
@@ -114,13 +114,13 @@ export function demoView(bounds: FigureBounds, viewport: Size, pixelated: boolea
     centerX: bounds.x, centerY: bounds.y, pixelated };
 }
 
-export function demoDuration(value: number | "loop") {
+function demoDuration(value: number | "loop") {
   if (value === "loop") return value;
   if (!Number.isFinite(value) || value < 1 || value > 30) throw new RangeError("Display duration must be between 1 and 30 seconds");
   return Math.round(value * 60) / 60;
 }
 
-export function demoMultiplier(value: number) {
+function demoMultiplier(value: number) {
   if (!Number.isInteger(value) || value < 1 || value > 4) throw new RangeError("Detail and density must be 1–4×");
   return value;
 }
@@ -128,7 +128,7 @@ export function demoMultiplier(value: number) {
 // A demo-only experiment. The first birth keeps its original RNG/state; extra
 // births use fine jitter or whole image-cell offsets and share the same air physics.
 // Attach at the pre-update boundary.
-export function addDemoDensity(sim: PortalSimulation, density: () => number, pixelated: () => boolean = () => false) {
+function addDemoDensity(sim: PortalSimulation, density: () => number, pixelated: () => boolean = () => false) {
   const step = sim.step, random = new EmissionRandom(91);
   sim.step = function(this: PortalSimulation) {
     const emitted = this.totalEmitted, advance = this.advanceParticles;

@@ -16,7 +16,7 @@ import {
   Size,
 } from "./types";
 
-export type GifCanvas = HTMLCanvasElement | OffscreenCanvas;
+type GifCanvas = HTMLCanvasElement | OffscreenCanvas;
 export type GifContext = CanvasRenderingContext2D;
 export type GifSurface = {canvas: GifCanvas; context: GifContext};
 export type GifConfig = {
@@ -39,7 +39,7 @@ export type GifAssets = {
   buffer: ArrayBuffer;
   kernelModule: WebAssembly.Module | null;
 };
-export type GifFrameRequest = {
+type GifFrameRequest = {
   paused?: boolean;
   redraw?: boolean;
   step?: boolean;

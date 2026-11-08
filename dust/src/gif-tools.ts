@@ -11,7 +11,7 @@ export type GifTiming = {
   delay: number;
   tick: (index: number) => number;
 };
-export type GifEncodeAttempt = {bytes?: Uint8Array; estimatedBytes?: number};
+type GifEncodeAttempt = {bytes?: Uint8Array; estimatedBytes?: number};
 export type GifEncode = (
   size: Size,
   attempt: number,
@@ -81,14 +81,14 @@ export function cropBounds(
   return { x, y, width: Math.min(width, bounds.right + margin + 1) - x,
     height: Math.min(height, bounds.bottom + margin + 1) - y };
 }
-export function gifSize(crop: Size, scale: number): Size {
+function gifSize(crop: Size, scale: number): Size {
   return { width: Math.max(1, Math.round(crop.width * scale)), height: Math.max(1, Math.round(crop.height * scale)) };
 }
 
 // Smoothly mix matched views at the join. The caller chooses the direction;
 // zero endpoint slopes avoid a change in blending speed. Identical body and
 // background pixels remain byte-identical throughout the overlap.
-export function loopBlendWeight(phase: number) {
+function loopBlendWeight(phase: number) {
   return (1 + Math.cos(Math.PI * Math.max(0, Math.min(1, phase)))) / 2;
 }
 

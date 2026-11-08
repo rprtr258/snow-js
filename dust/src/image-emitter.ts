@@ -10,7 +10,7 @@ import {
 type ByteLike = number[] | Uint8Array | Uint8ClampedArray;
 
 export const IMAGE_COLOR = "#b43cff";
-export const IMAGE_DEFAULTS = Object.freeze({ motion: "rotate", degreesPerSecond: 30, density: 0.7, interval: 4, lifetime: 0.4, drift: 2, gravity: 0, turbulence: 0.03 });
+const IMAGE_DEFAULTS = Object.freeze({ motion: "rotate", degreesPerSecond: 30, density: 0.7, interval: 4, lifetime: 0.4, drift: 2, gravity: 0, turbulence: 0.03 });
 
 function number(value: unknown, name: string, low: number, high: number, integer = false) {
   if (!Number.isFinite(value) || (value as number) < low || (value as number) > high || (integer && !Number.isInteger(value)))

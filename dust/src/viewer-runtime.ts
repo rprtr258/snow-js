@@ -14,7 +14,7 @@ import {
   ViewerFrameRequest,
 } from "./types";
 // Presentation-only settings: hex strings in, packed colors out to the renderer.
-export function normalizeOptions(options: RawOptions): NormalizedOptions {
+function normalizeOptions(options: RawOptions): NormalizedOptions {
   return {
     core: !!options.core,
     glow: !!options.glow,
@@ -26,7 +26,7 @@ export function normalizeOptions(options: RawOptions): NormalizedOptions {
     portalSprite: options.portalSprite !== false,
   };
 }
-export function renderOptions(options: NormalizedOptions) {
+function renderOptions(options: NormalizedOptions) {
   return {
     core: options.core,
     glow: options.glow,

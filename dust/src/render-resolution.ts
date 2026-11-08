@@ -19,7 +19,7 @@ export const PREVIEW_RENDER_HEIGHT = PREVIEW_HEIGHT * RESOLUTION_SCALE;
 // MEDITATION_PORTAL_SPAN is the portal's real extent in world cells - it must
 // stay truthful for "half the screen" to be exact; do not inflate it to shrink
 // the portal.
-export const MEDITATION_PORTAL_SPAN = 146;
+const MEDITATION_PORTAL_SPAN = 146;
 
 export function fullscreenView(viewportWidth: number, viewportHeight: number, pixelRatio = 1) {
   const deviceWidth = Math.max(1, Math.round(viewportWidth * pixelRatio));

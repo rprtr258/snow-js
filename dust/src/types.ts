@@ -16,7 +16,7 @@ export type Segments = Segment[];
 
 // Shapes of the game-shipped inputs under static/assets/ (effects.json,
 // export-loops.json) plus the decoded resources built from effects.bin.
-export type AssetInfo = {
+type AssetInfo = {
   offset: number;
   length: number;
   width: number;
@@ -30,7 +30,7 @@ export type ImagePoint = {
   probability: number;
   time: number;
 };
-export type ImageAnimationInfo = {
+type ImageAnimationInfo = {
   offset: number;
   count: number;
   stride: number;
@@ -107,7 +107,7 @@ export type EmitterConfig = {
   imageProbability?: number;
 };
 // XML emitter attributes arrive as strings; sprite emitters keep the raw keys.
-export type SpriteEmitterConfig = {
+type SpriteEmitterConfig = {
   sprites: SpriteSpec[];
   [key: string]: string | number | boolean | SpriteSpec[] | undefined;
 };

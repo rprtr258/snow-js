@@ -68,7 +68,7 @@ function sortedRange(rng: EmissionRandom, a: number, b: number) {
   return a <= b ? rng.range(a, b) : rng.range(b, a);
 }
 // 0x00bc984f..0x00bc99f0, checked by executing the native instruction range.
-export function imageWindow(
+function imageWindow(
   cursor: number,
   speed: number,
   loop: boolean,
@@ -93,7 +93,7 @@ export function imageWindow(
     count: start < 0 ? 0 : Math.max(0, end - start),
   };
 }
-export class SourceSimulation extends PortalSimulation {
+class SourceSimulation extends PortalSimulation {
   declare effect: string;
   declare definition: EffectDefinition;
   declare resources: Resources;
@@ -383,12 +383,12 @@ export class SourceSimulation extends PortalSimulation {
 // Original geometry keeps meditation's stationary births, friction, airflow,
 // and -1/lifetime fading. The default lingers 50% longer; the math-only control
 // scales lifetimes for new sparks without changing the native Noita emitters.
-export const MATH_EMISSION = Object.freeze({
+const MATH_EMISSION = Object.freeze({
   ...PORTAL_EMITTERS.trail,
   lifeMin: PORTAL_EMITTERS.trail.lifeMin * MATH_TRAIL_SCALE.default,
   lifeMax: PORTAL_EMITTERS.trail.lifeMax * MATH_TRAIL_SCALE.default,
 });
-export class MathSimulation extends PortalSimulation {
+class MathSimulation extends PortalSimulation {
   declare effect: string;
   declare guides: Segments;
   declare frame: number;

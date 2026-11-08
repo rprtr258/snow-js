@@ -21,9 +21,9 @@ import {
 } from "./types";
 
 export const DT = Math.fround(1 / 60);
-export const RNG_SCALE = 4.656612875e-10;
+const RNG_SCALE = 4.656612875e-10;
 export const MAX_PARTICLES = 1000000;
-export const SPARK = Object.freeze({
+const SPARK = Object.freeze({
   r: Math.fround(180 / 255),
   g: Math.fround(60 / 255),
   b: 1,
@@ -155,7 +155,7 @@ export function simplex3(x: number, y: number, z: number) {
 }
 
 // 0x008720c0. JS bitwise operations deliberately wrap to 32 bits.
-export function coordinateHash(a: number, b: number, c: number) {
+function coordinateHash(a: number, b: number, c: number) {
   a = ((a - b - c) ^ (c >>> 13)) >>> 0;
   b = ((b - a - c) ^ (a << 8)) >>> 0;
   c = ((c - a - b) ^ (b >>> 13)) >>> 0;
@@ -203,7 +203,7 @@ export class NoitaRandom {
   }
 }
 
-export function proceduralRandomi(x: number, y: number, min: number, max: number, worldSeed = 0) {
+function proceduralRandomi(x: number, y: number, min: number, max: number, worldSeed = 0) {
   return new NoitaRandom().seed(x, y, worldSeed).integer(min, max);
 }
 
@@ -226,7 +226,7 @@ export class EmissionRandom {
 
 // Lua doubles, then EntitySetTransform's float conversion.
 // The odd fixed-vertex modulo FIVE, one-based random argument, and inverted lerp are intentional.
-export function meditationPoints(frame: number, worldSeed = 0, x = 0, y = 0, period = 0): V2[] {
+function meditationPoints(frame: number, worldSeed = 0, x = 0, y = 0, period = 0): V2[] {
   const verts: [number, number, number][] = [
     [1, 0, 1],
     [-1, 0, 1],
@@ -275,7 +275,7 @@ export function hourglassEmitters(frame: number, x = 0, y = 0, period = 0) {
 }
 
 // 0x00713e20, no collision/attractor branch. Velocities are pixels/SECOND.
-export function stepParticle(p: Particle, time: number, dt = DT) {
+function stepParticle(p: Particle, time: number, dt = DT) {
   p.age++;
   const nx = Math.fround(p.x + Math.fround(p.vx * dt)),
     ny = Math.fround(p.y + Math.fround(p.vy * dt));
@@ -352,7 +352,7 @@ for (let i = 0; i < SIN_LUT.length; i++)
 // particle (the wasm batch in advanceParticles evaluates the staged pool in
 // one call, from this same pre-step state — bit-identical to the inline
 // call); undefined evaluates the noise inline.
-export function stepParticleFast(p: Particle, time: number, dt = DT, airflow?: number) {
+function stepParticleFast(p: Particle, time: number, dt = DT, airflow?: number) {
   p.age++;
   const airflowForce = p.airflowForce,
     friction = p.friction,
@@ -528,7 +528,7 @@ export function particleQuad(p: Particle) {
 
 // 0x00711db0 / 0x00711960. gfx_glow selects the glow particle pool; it is
 // NOT a per-particle RGB multiplier here. Vertex alpha is packed to 8 bits.
-export function particleGlowQuad(p: Particle) {
+function particleGlowQuad(p: Particle) {
   const alpha = Math.fround(p.alpha * (p.life < 1 ? p.life : 1));
   const brightness = p.ultrabright ? (p.drawLong ? 3 : 50) : 1;
   const packedAlpha =

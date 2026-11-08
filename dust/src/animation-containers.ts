@@ -4,16 +4,16 @@ export type FrameSpec = { width: number; height: number; count: number; delay: n
 type PngChunk = { type: string; data: Uint8Array };
 type Box = { type: string; start: number; end: number; data: Uint8Array };
 type AvifFrameData = { payload: Uint8Array; config: Uint8Array; color: Uint8Array; header: Uint8Array; width: number; height: number };
-export const ascii = (value: string) => Uint8Array.from(value, c => c.charCodeAt(0));
-export const textAt = (bytes: Uint8Array, start: number, count = 4) => String.fromCharCode(...bytes.subarray(start, start + count));
-export function concat(parts: Uint8Array[]) {
+const ascii = (value: string) => Uint8Array.from(value, c => c.charCodeAt(0));
+const textAt = (bytes: Uint8Array, start: number, count = 4) => String.fromCharCode(...bytes.subarray(start, start + count));
+function concat(parts: Uint8Array[]) {
   const result = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
   let offset = 0;
   for (const part of parts) { result.set(part, offset); offset += part.length; }
   return result;
 }
 const zeros = (n: number) => new Uint8Array(n);
-export function uint(value: number, length = 4, little = false) {
+function uint(value: number, length = 4, little = false) {
   const out = new Uint8Array(length);
   for (let i = 0; i < length; i++) { out[little ? i : length - i - 1] = value % 256; value = Math.floor(value / 256); }
   return out;
@@ -24,17 +24,17 @@ const crcTable = Uint32Array.from({ length: 256 }, (_, i) => {
   let n = i; for (let bit = 0; bit < 8; bit++) n = n & 1 ? 0xedb88320 ^ (n >>> 1) : n >>> 1;
   return n >>> 0;
 });
-export function crc32(bytes: Uint8Array) {
+function crc32(bytes: Uint8Array) {
   let crc = 0xffffffff;
   for (const byte of bytes) crc = crcTable[(crc ^ byte) & 255] ^ (crc >>> 8);
   return (crc ^ 0xffffffff) >>> 0;
 }
-export const PNG_SIGNATURE = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
-export function pngChunk(type: string, data: Uint8Array) {
+const PNG_SIGNATURE = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+function pngChunk(type: string, data: Uint8Array) {
   const body = concat([ascii(type), data]);
   return concat([uint(data.length), body, uint(crc32(body))]);
 }
-export function pngChunks(bytes: Uint8Array) {
+function pngChunks(bytes: Uint8Array) {
   if (!same(bytes.subarray(0, 8), PNG_SIGNATURE)) throw new Error("PNG encoder returned an invalid frame.");
   const chunks: PngChunk[] = [];
   for (let p = 8; p < bytes.length;) {
@@ -88,10 +88,10 @@ export class APNGMuxer {
   }
 }
 
-export function riffChunk(type: string, data: Uint8Array) {
+function riffChunk(type: string, data: Uint8Array) {
   return concat([ascii(type), uint(data.length, 4, true), data, zeros(data.length & 1)]);
 }
-export function webpImageChunks(bytes: Uint8Array) {
+function webpImageChunks(bytes: Uint8Array) {
   if (textAt(bytes, 0) !== "RIFF" || textAt(bytes, 8) !== "WEBP" || view(bytes).getUint32(4, true) + 8 !== bytes.length)
     throw new Error("WebP encoder returned an invalid frame.");
   const parts: Uint8Array[] = [];
@@ -131,7 +131,7 @@ export class WebPMuxer {
   }
 }
 
-export function boxes(bytes: Uint8Array, start = 0, end = bytes.length) {
+function boxes(bytes: Uint8Array, start = 0, end = bytes.length) {
   const result: Box[] = [];
   for (let p = start; p < end;) {
     if (p + 8 > end) throw new Error("Truncated AVIF box.");
@@ -150,7 +150,7 @@ const matrix = concat([uint(0x10000), zeros(12), uint(0x10000), zeros(12), uint(
 const handler = () => fullBox("hdlr", 0, 0, zeros(4), ascii("pict"), zeros(12), ascii("dust\0"));
 const infinity64 = new Uint8Array(8).fill(255);
 
-export function avifFrame(bytes: Uint8Array): AvifFrameData {
+function avifFrame(bytes: Uint8Array): AvifFrameData {
   const top = boxes(bytes), meta = top.find(b => b.type === "meta");
   if (!meta) throw new Error("AVIF frame has no metadata.");
   const children = boxes(meta.data, 4), pitm = children.find(b => b.type === "pitm")?.data;

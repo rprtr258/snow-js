@@ -2,7 +2,7 @@ import { PORTAL_EMITTERS, hourglassEmitters, PortalSimulation } from "./portal-p
 import { figureSegments } from "./math-figures";
 import { Point2 } from "./types";
 
-export function loopLifetime(sim: PortalSimulation) {
+function loopLifetime(sim: PortalSimulation) {
   if (sim.settings) return sim.settings.lifetime;
   if (sim.trailEmission) return sim.trailEmission.lifeMax;
   if (sim.emitters) return Math.max(0, ...sim.emitters.map(e => e.config.lifeMax),
@@ -30,7 +30,7 @@ export function movingBody(sim: PortalSimulation) {
 // Soft occupancy of authored body geometry, excluding random particle trails.
 // Matching an image of the body also recognizes rotational symmetries without
 // insisting that a particular vertex or spark returns to its old index.
-export function bodySignature(sim: PortalSimulation, tick: number) {
+function bodySignature(sim: PortalSimulation, tick: number) {
   const size = 32, field = new Float32Array(size * size), frame = sim.startFrame + tick - 1;
   const point = (x: number, y: number) => {
     x = (x + 192) / 384 * (size - 1); y = (y + 192) / 384 * (size - 1);
@@ -67,7 +67,7 @@ export function bodySignature(sim: PortalSimulation, tick: number) {
   for (let i = 0; i < field.length; i++) field[i] /= total;
   return field;
 }
-export function bodyDifference(a: Float32Array, b: Float32Array) {
+function bodyDifference(a: Float32Array, b: Float32Array) {
   let sum = 0;
   for (let i = 0; i < a.length; i++) sum += Math.abs(a[i] - b[i]);
   return sum / 2;

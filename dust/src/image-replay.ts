@@ -3,7 +3,7 @@ import { EmitterState } from "./types";
 
 // Live-preview scheduling, separate from native physics and export looping.
 // At normal playback speed, 30 empty simulation frames make a half-second gap.
-export const IMAGE_REPLAY_GAP = 30;
+const IMAGE_REPLAY_GAP = 30;
 
 export class ImageReplay {
   declare simulation: PortalSimulation;

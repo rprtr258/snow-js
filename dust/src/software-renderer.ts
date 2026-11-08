@@ -22,14 +22,14 @@ const roundCell = (x: number) => Math.floor(x + (x >= 0 ? 0.5 : -0.5));
 const LITTLE_ENDIAN = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1;
 // Native 0x00dd8450 allocates GL_RGBA / GL_UNSIGNED_BYTE render targets.
 // Keep these quantization boundaries: source blends, horizontal pass, history.
-export function byteRound(value: number) {
+function byteRound(value: number) {
   if (value <= 0) return 0;
   if (value >= 255) return 255;
   const low = Math.floor(value),
     part = value - low;
   return low + (part > 0.5 || (part === 0.5 && low & 1) ? 1 : 0);
 }
-export function unorm8(value: number) {
+function unorm8(value: number) {
   return f(byteRound(value * 255) / 255);
 }
 const colors = new Map<number, number[]>();
@@ -44,7 +44,7 @@ function rgb(packed: number) {
   }
   return c;
 }
-export function sampleTexture(
+function sampleTexture(
   image: RasterTexture,
   u: number,
   v: number,
@@ -80,7 +80,7 @@ type BlurPlan = {
   subRemove: Int32Array;
 };
 const blurPlans = new Map<string, BlurPlan>();
-export function blurAxis(
+function blurAxis(
   source: Float32Array,
   target: Float32Array,
   width: number,
