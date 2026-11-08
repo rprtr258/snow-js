@@ -46,7 +46,7 @@ export class ShiftRuntime extends GridRuntime {
       [`${f.id}:original`, { ...f, label: `${f.label} · original` }],
       [`${f.id}:shifted`, { ...f, label: `${f.label} · shifted` }],
     ]);
-    super(combined, buffer, kernelModule, { ...runtimeOptions, definitions, replayGroup: (key: string) => key.split(":")[0], simulationFactory: (options: SimulationOptions, data: Catalog, resources: Resources) => {
+    super(combined, buffer, kernelModule, { ...runtimeOptions, definitions, simulationFactory: (options: SimulationOptions, data: Catalog, resources: Resources) => {
       const [effect, variant] = options.effect!.split(":");
       return variant === "shifted"
         ? makeShiftSimulation({ ...options, effect }, data, resources, context.from, materials.get(context.to)!)

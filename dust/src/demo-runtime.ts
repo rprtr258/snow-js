@@ -9,7 +9,7 @@ import { Catalog, RawOptions, Resources, Size } from "./types";
 
 const DEMO = Object.freeze({ width: 480, height: 320, build: 90, animate: 300, fade: 90, historyLimit: 128 });
 export type FigureBounds = {x: number; y: number; width: number; height: number};
-export type DemoView_ = {
+type DemoView_ = {
   width: number;
   height: number;
   centerX: number;
@@ -21,7 +21,6 @@ export type DemoOptions = {
   random?: () => number;
   selection?: unknown;
   firstKey?: string | null;
-  replayImages?: boolean;
 };
 export type DemoFrameData = {
   elapsed?: number;
@@ -30,15 +29,12 @@ export type DemoFrameData = {
   selection?: unknown;
   viewport?: Size;
   duration?: number | "loop";
-  detail?: number;
   density?: number;
   randomColors?: boolean;
   colorMode?: string;
   background?: unknown;
   smoothGlow?: unknown;
   recycle?: ArrayBufferLike | null;
-  renderScale?: number;
-  options?: RawOptions;
 };
 
 // The vivid HSL palette from the original grid demo.
@@ -104,7 +100,7 @@ function fitFigure(bounds: FigureBounds, width: number, height: number) {
   return { scale, x: width / 2 - bounds.x * scale, y: height / 2 - bounds.y * scale };
 }
 
-export function demoView(bounds: FigureBounds, viewport: Size, pixelated: boolean): DemoView_ {
+function demoView(bounds: FigureBounds, viewport: Size, pixelated: boolean): DemoView_ {
   const { width, height } = viewport;
   if (![width, height].every(n => Number.isFinite(n) && n > 0 && n <= 16384)) throw new RangeError("Invalid demo viewport");
   // Include the entire visible world in the render, so outward-moving sparks
@@ -121,7 +117,7 @@ function demoDuration(value: number | "loop") {
 }
 
 function demoMultiplier(value: number) {
-  if (!Number.isInteger(value) || value < 1 || value > 4) throw new RangeError("Detail and density must be 1–4×");
+  if (!Number.isInteger(value) || value < 1 || value > 4) throw new RangeError("Density must be 1–4×");
   return value;
 }
 
@@ -165,7 +161,6 @@ export class DemoRuntime {
   declare pending: number;
   declare duration: number | "loop";
   declare viewport: Size;
-  declare detail: number;
   declare density: number;
   declare history: DemoHistoryItem[];
   declare historyCursor: number;
@@ -185,14 +180,11 @@ export class DemoRuntime {
     catalog: Catalog,
     buffer: ArrayBuffer,
     kernelModule: WebAssembly.Module | null = null,
-    { random = Math.random, selection = null, firstKey = null, replayImages = true }: DemoOptions = {},
+    { random = Math.random, selection = null, firstKey = null }: DemoOptions = {},
   ) {
     this.viewer = new ViewerRuntime(catalog, buffer, DEMO.width, DEMO.height, kernelModule, {
-      replayImages,
+      replayImages: false,
       setupSimulation: sim => this.prepareSimulation(sim),
-      // Avoid starting a new image pass that the scheduled transition would
-      // immediately interrupt. Infinite display can always play another pass.
-      allowImageReplay: cycleFrames => this.exitStart === null && this.endFrame() - this.frameNumber >= cycleFrames,
     });
     this.figures = new Map(figureGroups(catalog).flatMap(group => group.entries));
     this.random = random;
@@ -203,7 +195,6 @@ export class DemoRuntime {
     this.pending = 0;
     this.duration = 5;
     this.viewport = { width: DEMO.width, height: DEMO.height };
-    this.detail = 2;
     this.density = 1;
     this.history = [];
     this.historyCursor = -1;
@@ -301,11 +292,11 @@ export class DemoRuntime {
   frame(data: DemoFrameData = {}) {
     return this.advanceFrame(data);
   }
-  advanceFrame({ elapsed = 0, paused = false, navigate = 0, selection, viewport = this.viewport, duration = this.duration, detail = this.detail, density = this.density, randomColors, colorMode = randomColors === undefined ? this.colorMode : randomColors ? "random" : "original", background: rawBackground = this.background, smoothGlow = this.smoothGlow, recycle = null }: DemoFrameData = {}): Record<string, unknown> {
+  advanceFrame({ elapsed = 0, paused = false, navigate = 0, selection, viewport = this.viewport, duration = this.duration, density = this.density, randomColors, colorMode = randomColors === undefined ? this.colorMode : randomColors ? "random" : "original", background: rawBackground = this.background, smoothGlow = this.smoothGlow, recycle = null }: DemoFrameData = {}): Record<string, unknown> {
     if (!Number.isFinite(elapsed) || elapsed < 0) throw new RangeError("Invalid demo timing");
     if (!Number.isInteger(navigate) || Math.abs(navigate) > DEMO.historyLimit) throw new RangeError("Invalid demo navigation");
     duration = demoDuration(duration);
-    detail = demoMultiplier(detail); density = demoMultiplier(density);
+    density = demoMultiplier(density);
     if (!COLOR_MODES.includes(colorMode)) throw new RangeError("Invalid demo color mode");
     const background = validateColor(rawBackground) ?? "#000000";
     if (this.key && duration !== this.duration) {
@@ -314,7 +305,6 @@ export class DemoRuntime {
       else if (duration !== "loop" && this.frameNumber >= DEMO.build + duration * 60 && this.exitStart === null) this.requestExit(1);
     }
     this.duration = duration;
-    this.detail = detail;
     this.density = density;
     this.colorMode = colorMode;
     this.background = background;
@@ -323,7 +313,7 @@ export class DemoRuntime {
     if (selection !== undefined) this.setSelection(selection);
     for (let i = 0; i < Math.abs(navigate); i++) this.requestExit(Math.sign(navigate));
     if (!this.key) return { empty: true, key: null, label: "", phase: "empty", progress: 0, reveal: 0, canPrevious: false, colorMode,
-      width: DEMO.width, height: DEMO.height, detail: 1, density };
+      width: DEMO.width, height: DEMO.height, density };
     if (navigate || paused) this.pending = 0;
     else this.pending = Math.min(this.pending + Math.min(elapsed, 250), FRAME_MS * 3);
     const steps = paused ? 0 : Math.min(2, Math.floor((this.pending + 1e-8) / FRAME_MS));
@@ -343,9 +333,9 @@ export class DemoRuntime {
         this.viewer.setView(view);
         options.color = figureColor(this.history[this.historyCursor], colorMode);
       }
-      result = this.viewer.frame({ step: true, renderScale: detail, recycle: i === 0 ? recycle : null, options });
+      result = this.viewer.frame({ step: true, recycle: i === 0 ? recycle : null, options });
     }
-    result ??= this.viewer.frame({ paused: true, redraw: true, renderScale: detail, recycle, options });
+    result ??= this.viewer.frame({ paused: true, redraw: true, recycle, options });
     const end = this.exitStart ?? this.endFrame();
     const phase = this.frameNumber >= end ? "fade" : this.frameNumber < DEMO.build ? "build" : "animate";
     return {
@@ -355,7 +345,7 @@ export class DemoRuntime {
       reveal: this.reveal(), colorMode, background,
       pixelated: this.pixelated, baseWidth: view.width, baseHeight: view.height,
       canPrevious: this.historyCursor > 0, duration: this.duration,
-      detail: 1, density,
+      density,
       width: view.width, height: view.height,
     };
   }

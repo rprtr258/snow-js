@@ -1,7 +1,7 @@
 import { ViewerRuntime } from "./viewer-runtime";
 import { GridRuntime, GridEntry } from "./grid-runtime";
 import { ShiftRuntime } from "./shift-runtime";
-import { DemoRuntime, demoView, figureBounds } from "./demo-runtime";
+import { DemoRuntime, figureBounds } from "./demo-runtime";
 import { prepareContinuous } from "./gif-loop";
 import { GridLayout } from "./grid-layout";
 import { ShiftData } from "./material-shifts";
@@ -45,8 +45,6 @@ type GifFrameRequest = {
   step?: boolean;
   elapsed?: number;
   recycle?: ArrayBufferLike;
-  detail?: number;
-  renderScale?: number;
   options?: RawOptions;
 };
 export type GifFrameResult = {
@@ -120,8 +118,8 @@ export class GifScene {
     const { catalog, buffer, kernelModule } = assets;
     if (this.grid) {
       const runtime: GridRuntime = config.kind === "shifts"
-        ? new ShiftRuntime(catalog, buffer, kernelModule, config.shiftData!, { replayImages: false })
-        : new GridRuntime(catalog, buffer, kernelModule, { replayImages: false });
+        ? new ShiftRuntime(catalog, buffer, kernelModule, config.shiftData!)
+        : new GridRuntime(catalog, buffer, kernelModule);
       this.runtime = runtime as unknown as GifRuntime;
       runtime.configure({ ...config.state, showNames: false, restart: true });
       if (!runtime.selection.length) throw new Error("Select at least one figure first.");
@@ -131,7 +129,7 @@ export class GifScene {
       this.width = this.result.layout.width; this.height = this.result.layout.height;
     } else if (config.kind === "demo") {
       if (!config.key) throw new Error("Select a figure first.");
-      const runtime = new DemoRuntime(catalog, buffer, kernelModule, { selection: [config.key], random: () => 0.5, replayImages: false });
+      const runtime = new DemoRuntime(catalog, buffer, kernelModule, { selection: [config.key], random: () => 0.5 });
       this.runtime = runtime as unknown as GifRuntime;
       // Export only the current figure. Continuous loops also repeat its emitters.
       runtime.duration = "loop";
@@ -142,9 +140,7 @@ export class GifScene {
       }
       const item = runtime.history[runtime.historyCursor];
       item.color = item.gray = config.color ?? "#ffffff";
-      const view = demoView(runtime.bounds, config.viewport!, runtime.pixelated);
-      this.settings = { ...config.settings, duration: "loop", selection: [config.key], viewport: config.viewport,
-        detail: Math.max(1, Math.min(4, Math.floor(2048 / Math.max(view.width, view.height)))) };
+      this.settings = { ...config.settings, duration: "loop", selection: [config.key], viewport: config.viewport };
       this.result = this.runtime.frame({ ...this.settings, paused: true });
       this.width = this.result.width; this.height = this.result.height;
       this.baseWidth = this.result.baseWidth; this.baseHeight = this.result.baseHeight;
@@ -154,7 +150,7 @@ export class GifScene {
       this.runtime = runtime as unknown as GifRuntime;
       runtime.restart(config.replay);
       if (looping) this.warmFrames = prepareContinuous(runtime.simulation);
-      this.settings = { options: config.options, renderScale: 4 };
+      this.settings = { options: config.options };
       this.result = this.runtime.frame({ ...this.settings, paused: true, redraw: true });
       this.width = 480; this.height = 320;
       this.baseWidth = 480; this.baseHeight = 320;
@@ -191,7 +187,7 @@ export class GifScene {
       if (tick < this.warmFrames - 240) {
         for (const sim of sims) sim.step();
         this.ticks++;
-      } else this.advance(this.ticks + 1, true);
+      } else this.advance(this.ticks + 1);
       if (tick % 16 === 0 || tick + 1 === this.warmFrames) await report(tick + 1, this.warmFrames);
     }
     this.redraw();
@@ -200,12 +196,12 @@ export class GifScene {
     if (this.grid) this.result = this.runtime.frame({ paused: true, redraw: true }); else if (this.config.kind === "demo") this.result = this.runtime.frame({ ...this.settings, paused: true });
     else this.result = this.runtime.frame({ ...this.settings, paused: true, redraw: true });
   }
-  advance(target: number, warming = false) {
+  advance(target: number) {
     while (this.ticks < target) {
       const recycle = this.result?.pixels?.buffer;
       this.result = this.config.kind === "demo"
-        ? this.runtime.frame({ ...this.settings, ...(warming ? { detail: 1 } : {}), elapsed: FRAME_MS, recycle })
-        : this.runtime.frame({ ...this.settings, ...(warming ? { renderScale: 1 } : {}), step: true, recycle });
+        ? this.runtime.frame({ ...this.settings, elapsed: FRAME_MS, recycle })
+        : this.runtime.frame({ ...this.settings, step: true, recycle });
       this.ticks++;
     }
   }

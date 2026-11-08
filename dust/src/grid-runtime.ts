@@ -2,7 +2,6 @@ import { decodeAssets, makeSimulation } from "./effect-simulation";
 import { SoftwareRenderer } from "./software-renderer";
 import { MATH_TRAIL_SCALE, validateMathTrailScale } from "./math-settings";
 import { packColor, validateColor } from "./particle-color";
-import { imageReplay, ImageReplay } from "./image-replay";
 import { SimulationFactory, PortalSimulation, TrailScalableSimulation } from "./portal-physics";
 import {
   Catalog,
@@ -23,15 +22,11 @@ import {
 import { FRAME_MS } from "./timing";
 export type GridEntry = {
   simulation: PortalSimulation;
-  imageReplay: ImageReplay | null;
-  imageCycles: number;
   history: Float32Array;
 };
 export type GridRuntimeOptions = {
   simulationFactory?: SimulationFactory;
   definitions?: FigureEntry[];
-  replayImages?: boolean;
-  replayGroup?: (key: string) => string;
 };
 export type GridConfigureState = {
   selection?: string[];
@@ -55,8 +50,6 @@ export class GridRuntime {
   declare definitions: Map<string, FigureDefinition>;
   declare renderer: SoftwareRenderer;
   declare entries: Map<string, GridEntry>;
-  declare imageReplayGroups: string[][];
-  declare replayImages: boolean;
   declare selection: string[];
   declare mathTrailScale: number;
   declare options: {core: boolean; glow: boolean};
@@ -70,7 +63,6 @@ export class GridRuntime {
   declare pending: number;
   declare dirty: boolean;
   declare revision: number;
-  declare replayGroup: (key: string) => string;
   constructor(
     catalog: Catalog,
     buffer: ArrayBuffer,
@@ -78,14 +70,11 @@ export class GridRuntime {
     {
       simulationFactory = makeSimulation,
       definitions = figureGroups(catalog).flatMap(group => group.entries),
-      replayImages = true,
-      replayGroup = (key: string) => key,
     }: GridRuntimeOptions = {},
   ) {
     this.catalog = catalog;
     this.kernelModule = kernelModule;
     this.simulationFactory = simulationFactory;
-    Object.assign(this, { replayImages, replayGroup });
     this.resources = decodeAssets(catalog, buffer);
     this.definitions = new Map(definitions);
     // Share assets, WASM instance and scratch buffers. Only history and simulation
@@ -98,7 +87,6 @@ export class GridRuntime {
       { kernelModule },
     );
     this.entries = new Map();
-    this.imageReplayGroups = [];
     this.selection = [];
     this.mathTrailScale = MATH_TRAIL_SCALE.default;
     this.options = { core: true, glow: true };
@@ -163,13 +151,6 @@ export class GridRuntime {
     // Removed tiles release their particle pools and history. Retained tiles keep
     // their frame, RNG and glow even when the grid is rearranged or resized.
     this.entries = entries;
-    const groups = new Map();
-    for (const [key, entry] of entries) if (entry.imageReplay) {
-      const group = this.replayGroup(key);
-      if (!groups.has(group)) groups.set(group, []);
-      groups.get(group).push(key);
-    }
-    this.imageReplayGroups = [...groups.values()];
     this.selection = [...selection];
     this.layout = layout;
     this.showNames = !!showNames;
@@ -183,16 +164,9 @@ export class GridRuntime {
     this.pending = 0;
     this.dirty = true;
   }
-  createEntry(key: string, mathTrailScale: number, previous: GridEntry | null = null) {
+  createEntry(key: string, mathTrailScale: number) {
     const simulation = this.simulationFactory({ effect: key, mathTrailScale, retainInvisible: false }, this.catalog, this.resources);
-    return { simulation, imageReplay: this.replayImages ? imageReplay(simulation) : null,
-      imageCycles: previous ? previous.imageCycles + 1 : 0,
-      history: previous?.history ?? new Float32Array(this.renderer.history.length) };
-  }
-  replayFinishedImages() {
-    const restart = this.imageReplayGroups.filter(group => group.every(key => this.entries.get(key)!.imageReplay!.ready)).flat();
-    if (!restart.length) return;
-    for (const key of restart) this.entries.set(key, this.createEntry(key, this.mathTrailScale, this.entries.get(key)));
+    return { simulation, history: new Float32Array(this.renderer.history.length) };
   }
   tileOptions(key: string) {
     return {
@@ -230,9 +204,7 @@ export class GridRuntime {
           ? 0
           : Math.min(2, Math.floor((this.pending + 1e-8) / FRAME_MS));
     if (steps && !step) this.pending -= FRAME_MS * steps;
-    if (steps) this.replayFinishedImages();
-    let pixels: Uint8ClampedArray | null = null, simulationMS = 0;
-    const start = performance.now();
+    let pixels: Uint8ClampedArray | null = null;
     if (steps || redraw || this.dirty) {
       const { width, height, tiles } = this.layout;
       pixels = recycle?.byteLength === width * height * 4
@@ -245,10 +217,7 @@ export class GridRuntime {
         this.renderer.history.set(entry.history);
         let image: Uint8ClampedArray | undefined;
         for (let j = 0; j < steps; j++) {
-          const started = performance.now();
           entry.simulation.step();
-          entry.imageReplay?.afterStep();
-          simulationMS += performance.now() - started;
           image = this.renderer.render(entry.simulation, options, true);
         }
         if (!steps) image = this.renderer.render(entry.simulation, options, false);
@@ -257,30 +226,6 @@ export class GridRuntime {
       }
       this.dirty = false;
     }
-    return {
-      revision: this.revision,
-      pixels,
-      steps,
-      layout: this.layout,
-      stats: {
-        simulationMS,
-        renderMS: performance.now() - start - simulationMS,
-        accelerated: !!this.renderer.native,
-        slow,
-        frameMS: performance.now() - start,
-        figures: this.selection.map((key) => {
-          const s = this.entries.get(key)!.simulation;
-          return {
-            key,
-            label: this.definitions.get(key)!.label,
-            frame: s.frame,
-            imageCycles: this.entries.get(key)!.imageCycles,
-            particles: s.particles.length,
-            emitted: s.totalEmitted,
-            dropped: s.dropped,
-          };
-        }),
-      },
-    };
+    return { revision: this.revision, pixels, steps, layout: this.layout };
   }
 }

@@ -276,7 +276,6 @@ export type FrameRequest = {
 export type ViewerFrameRequest = FrameRequest & {
   mathTrailScale?: number;
   imageSettings?: unknown;
-  renderScale?: number;
   options?: RawOptions;
 };
 
@@ -351,5 +350,4 @@ export type SimulationOptions = {
   particleMirror?: boolean;
   imageEmitter?: ImageEmitterOptions;
   imageOnce?: boolean;
-  custom_image?: boolean;
 };
