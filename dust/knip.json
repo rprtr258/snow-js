@@ -1,0 +1,17 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  // Browser entries mirror scripts/build.ts ENTRIES (the worker URLs must stay
+  // in sync with it); bun test files and the manually run scripts/*.ts tools
+  // are entry points too.
+  "entry": [
+    "src/portal-viewer.ts",
+    "src/meditation.ts",
+    "src/render-worker.ts",
+    "src/gif-worker.ts",
+    "src/export-frame-worker.ts",
+    "src/*.test.ts",
+    "scripts/*.ts"
+  ],
+  "project": ["src/**/*.ts", "scripts/**/*.ts"],
+  "ignoreBinaries": ["wat2wasm"]
+}
