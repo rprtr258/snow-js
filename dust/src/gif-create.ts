@@ -225,4 +225,3 @@ export async function createAnimation(
     if (headSurface) headSurface.canvas.width = headSurface.canvas.height = 1;
   }
 }
-export const createGif = createAnimation;

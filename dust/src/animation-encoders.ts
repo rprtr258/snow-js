@@ -52,10 +52,6 @@ async function codecModule(format: string): Promise<{module: CodecModule; defaul
   })().catch(error => { modules.delete(format); throw error; }));
   return modules.get(format)!;
 }
-export async function prepareEncoder(format: string) {
-  animationFormat(format);
-  if (format === "webp" || format === "avif") await codecModule(format);
-}
 export function canvasPNG(canvas: EncodeCanvas): Promise<Blob> {
   if (canvas.convertToBlob) return canvas.convertToBlob({ type: "image/png" });
   return new Promise((resolve, reject) => canvas.toBlob!(blob => blob ? resolve(blob) : reject(new Error("PNG encoding failed.")), "image/png"));

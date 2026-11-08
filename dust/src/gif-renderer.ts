@@ -144,7 +144,7 @@ export class GifScene {
       item.color = item.gray = config.color ?? "#ffffff";
       const view = demoView(runtime.bounds, config.viewport!, runtime.pixelated);
       this.settings = { ...config.settings, duration: "loop", selection: [config.key], viewport: config.viewport,
-        detail: Math.max(1, Math.min(4, Math.floor(2048 / Math.max(view.width, view.height)))), stats: false };
+        detail: Math.max(1, Math.min(4, Math.floor(2048 / Math.max(view.width, view.height)))) };
       this.result = this.runtime.frame({ ...this.settings, paused: true });
       this.width = this.result.width; this.height = this.result.height;
       this.baseWidth = this.result.baseWidth; this.baseHeight = this.result.baseHeight;

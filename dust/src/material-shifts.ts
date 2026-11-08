@@ -22,21 +22,7 @@ export type ShiftFigure = FigureDefinition & {
   group: string;
   materials: string[];
 };
-type RawShiftSettings = {
-  from?: string;
-  to?: string;
-  selection?: unknown;
-  zoom?: number;
-  compare?: unknown;
-  glow?: unknown;
-  core?: unknown;
-  speed?: number;
-  background?: string;
-};
 export const SHIFT_DEFAULTS = Object.freeze({ from: "spark_purple", to: "gold", zoom: 2, compare: true, background: "#000000" });
-export const SHIFT_STORAGE = "dust-material-shifts-v1";
-export const materialHex = (material: MaterialInfo) => `#${(material.color & 0xffffff).toString(16).padStart(6, "0")}`;
-export const materialLabel = (material: {name: string; id: string}) => `${material.name} · ${material.id}`;
 export function shiftFigures(catalog: Catalog, shiftData: ShiftData): ShiftFigure[] {
   return [
     ...Object.entries(EFFECTS).map(([id, data]) => ({ id, ...data, group: "Portals", materials: ["spark_purple"] })),
@@ -46,7 +32,6 @@ export function shiftFigures(catalog: Catalog, shiftData: ShiftData): ShiftFigur
     })),
   ];
 }
-export function matchingFigures(figures: ShiftFigure[], source: string) { return figures.filter(f => f.materials.includes(source)); }
 export function shiftMaterials(data: ShiftData) {
   if (data?.version !== 1 || !Array.isArray(data.materials)) throw new Error("Material data could not be read.");
   return new Map(data.materials.map(m => [m.id, m]));
@@ -87,18 +72,4 @@ export function makeShiftSimulation(
     return from === "spark_purple" ? new ShiftPortalSimulation(options, target) : makeSimulation(options, catalog, resources);
   const shifted: Catalog = { ...catalog, materials: { ...catalog.materials, [from]: target } };
   return makeSimulation(options, shifted, resources);
-}
-
-export function readShiftSettings(raw: unknown, figures: ShiftFigure[], materials: Map<string, ShiftMaterial>) {
-  const state = (raw ?? {}) as RawShiftSettings;
-  const sourceIds = new Set(figures.flatMap(f => f.materials));
-  const from = sourceIds.has(state.from ?? "") ? state.from! : SHIFT_DEFAULTS.from;
-  const to = materials.get(state.to ?? "")?.shiftable ? state.to! : SHIFT_DEFAULTS.to;
-  const ids = matchingFigures(figures, from).map(f => f.id);
-  const selected = state.selection;
-  const selection = Array.isArray(selected) ? ids.filter(id => selected.includes(id)) : ids;
-  return { from, to, selection, zoom: [1, 2, 4].includes(state.zoom ?? 0) ? state.zoom! : 2,
-    compare: state.compare !== false, glow: state.glow !== false, core: state.core !== false,
-    speed: [0.25, 0.5, 1, 2].includes(state.speed ?? 0) ? state.speed! : 1,
-    background: /^#[0-9a-f]{6}$/i.test(state.background ?? "") ? state.background!.toLowerCase() : "#000000" };
 }

@@ -23,9 +23,3 @@ export function glowDitherField(width: number, height: number) {
   for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) noise[y * width + x] = glowDither(x, y);
   return noise;
 }
-
-export const GLOW_DITHER_GLSL = `
-uniform highp sampler2D glowDitherTexture;
-float glowDither(uvec2 pixel) {
-  return texelFetch(glowDitherTexture,ivec2(pixel&uvec2(${GLOW_DITHER_SIZE - 1}u)),0).r;
-}`;

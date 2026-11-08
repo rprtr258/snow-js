@@ -282,18 +282,8 @@ export type ViewerFrameRequest = FrameRequest & {
 
 // Image-authoring types (src/image-emitter.ts), shared with the simulations
 // and the UI that inspects a loaded image emitter.
-export type SourceImage = {width: number; height: number; rgba: Uint8Array};
 export type Mask = {width: number; height: number; values: Uint8Array};
 export type EmissionPoint = {x: number; y: number; probability: number};
-export type MaskSettings = {
-  resolution: number;
-  channel: string;
-  threshold: number;
-  invert: boolean;
-  trim: boolean;
-  shape: string;
-  shaded: boolean;
-};
 export type ImageSettings = {
   motion: string;
   degreesPerSecond: number;
@@ -304,7 +294,6 @@ export type ImageSettings = {
   gravity: number;
   turbulence: number;
 };
-export type MaskSettingsInput = Partial<MaskSettings>;
 export type ImageSettingsInput = Partial<ImageSettings>;
 // The packed color particles blend with when they carry no color of their own
 // (SoftwareRenderer.rgb decodes r = packed >>> 16 & 255 → rgb 180/60/255).

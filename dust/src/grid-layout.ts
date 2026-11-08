@@ -115,16 +115,6 @@ export function fitGrid(
   return { width, height, columns: best.columns, rows: best.rows, tiles };
 }
 
-// Which tile (image or label) contains a canvas point; -1 for gaps and margins.
-export function tileAt(layout: GridLayout, x: number, y: number) {
-  return layout.tiles.findIndex(tile =>
-    x >= tile.x &&
-    x < tile.x + tile.width &&
-    y >= tile.y &&
-    y < tile.y + tile.height,
-  );
-}
-
 // Down/upscale only the finished image, not the simulation or glow calculation.
 export function blitTile(
   source: Uint8ClampedArray,

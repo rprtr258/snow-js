@@ -2,8 +2,7 @@ import { ViewerRuntime } from "./viewer-runtime";
 import { figureGroups, FigureDefinition } from "./grid-layout";
 import { figureSegments } from "./math-figures";
 import { EmissionRandom, PortalSimulation, MAX_PARTICLES } from "./portal-physics";
-import { COLOR_MODES, grayColor, figureColor, DemoSettings } from "./demo-settings";
-import { bufferMemory } from "./demo-stats";
+import { COLOR_MODES, grayColor, figureColor } from "./demo-settings";
 import { validateColor } from "./particle-color";
 import { FRAME_MS } from "./timing";
 import { Catalog, RawOptions, Resources, Size } from "./types";
@@ -25,7 +24,6 @@ export type DemoOptions = {
   replayImages?: boolean;
 };
 export type DemoFrameData = {
-  stats?: boolean;
   elapsed?: number;
   paused?: boolean;
   navigate?: number;
@@ -183,10 +181,6 @@ export class DemoRuntime {
   declare color: string;
   declare gray: string;
   declare densityRandom: EmissionRandom | undefined;
-  declare statsEnabled: boolean;
-  declare cpuMS: number;
-  declare memory: {cpuBytes: number} | null;
-  declare memoryTime: number;
   constructor(
     catalog: Catalog,
     buffer: ArrayBuffer,
@@ -305,20 +299,7 @@ export class DemoRuntime {
     if (this.exitDirections.length < DEMO.historyLimit) this.exitDirections.push(direction);
   }
   frame(data: DemoFrameData = {}) {
-    this.statsEnabled = !!data.stats;
-    const started = performance.now();
-    const result = this.advanceFrame(data);
-    this.cpuMS = performance.now() - started;
-    return { ...result, stats: this.getStats() };
-  }
-  getStats() {
-    if (!this.statsEnabled) return null;
-    const now = performance.now();
-    if (!this.memory || now - this.memoryTime >= 1000) { this.memory = bufferMemory(this.viewer); this.memoryTime = now; }
-    const sim = this.viewer.simulation;
-    return { cpuMS: this.cpuMS ?? 0,
-      ...this.memory!, particles: sim?.particles.length ?? 0, visible: sim?.visibleCount ?? 0, dropped: sim?.dropped ?? 0,
-      frame: sim?.frame ?? 0 };
+    return this.advanceFrame(data);
   }
   advanceFrame({ elapsed = 0, paused = false, navigate = 0, selection, viewport = this.viewport, duration = this.duration, detail = this.detail, density = this.density, randomColors, colorMode = randomColors === undefined ? this.colorMode : randomColors ? "random" : "original", background: rawBackground = this.background, smoothGlow = this.smoothGlow, recycle = null }: DemoFrameData = {}): Record<string, unknown> {
     if (!Number.isFinite(elapsed) || elapsed < 0) throw new RangeError("Invalid demo timing");

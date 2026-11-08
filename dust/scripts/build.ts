@@ -8,7 +8,6 @@ const OUT = new URL("../dist/", import.meta.url).pathname;
 const ENTRIES = [
   "src/portal-viewer.ts",
   "src/meditation.ts",
-  "src/ui-shell.ts",
   "src/render-worker.ts",
   "src/gif-worker.ts",
   "src/export-frame-worker.ts",

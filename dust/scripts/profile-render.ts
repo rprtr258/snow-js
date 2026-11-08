@@ -30,7 +30,7 @@ const sim = makeSimulation(replay(W, H), catalog, resources);
 const renderer = new SoftwareRenderer(W, H, resources, catalog, { scale });
 const kernelModule = new WebAssembly.Module(readFileSync(`${ROOT}dist/assets/raster.wasm`));
 // attach wasm like harness buildRenderer does
-const withKernel = new SoftwareRenderer(W, H, resources, catalog, { kernelModule, scale });
+new SoftwareRenderer(W, H, resources, catalog, { kernelModule, scale });
 
 for (let i = 0; i < 600; i++) sim.step();
 for (let i = 0; i < 20; i++) renderer.render(sim, RENDER, true, null);

@@ -1,7 +1,6 @@
 // Build-specific, isolated cosmetic-particle reconstruction. See docs/portal-research.md.
 // No terrain, external forces, camera culling, or other entities' shared RNG calls.
 import { loopAngle } from "./loop-motion";
-import { FRAME_MS } from "./timing";
 import {
   Catalog,
   EmissionConfig,
@@ -23,7 +22,6 @@ import {
 
 export const DT = Math.fround(1 / 60);
 export const RNG_SCALE = 4.656612875e-10;
-export const BUILD = "17130612";
 export const MAX_PARTICLES = 1000000;
 export const SPARK = Object.freeze({
   r: Math.fround(180 / 255),
@@ -591,19 +589,6 @@ export function writeParticleVertices(p: Particle, glow: boolean, out: Float32Ar
   out[7] = Math.fround(y + Math.fround(Math.fround(s * l) + Math.fround(c * b)));
   return q.alpha;
 }
-export function particleVertices(p: Particle, glow = false) {
-  const out = new Float32Array(8),
-    alpha = writeParticleVertices(p, glow, out);
-  return {
-    corners: [
-      [out[0], out[1]],
-      [out[2], out[3]],
-      [out[4], out[5]],
-      [out[6], out[7]],
-    ],
-    alpha,
-  };
-}
 
 export type SimulationFactory = (
   options: SimulationOptions,
@@ -1057,35 +1042,5 @@ export class PortalSimulation {
     meta[n] = 0;
     this.mirrorN = n;
     this.mirrorDrawLong = drawLong;
-  }
-}
-
-// No simulation-frame skipping: bounded work per RAF, outstanding frames retained.
-export class FixedStepClock {
-  declare pending: number;
-  constructor() {
-    this.pending = 0;
-  }
-  reset() {
-    this.pending = 0;
-  }
-  advance(milliseconds: number, speed: number, step: () => void, maxSteps = 12) {
-    if (
-      !Number.isFinite(milliseconds) ||
-      milliseconds < 0 ||
-      !Number.isFinite(speed) ||
-      speed < 0
-    ) {
-      throw new RangeError("Invalid clock input");
-    }
-    this.pending += milliseconds * speed;
-    let count = 0;
-    while (this.pending + 1e-8 >= FRAME_MS && count < maxSteps) {
-      step();
-      this.pending -= FRAME_MS;
-      count++;
-    }
-    if (Math.abs(this.pending) < 1e-8) this.pending = 0;
-    return count;
   }
 }

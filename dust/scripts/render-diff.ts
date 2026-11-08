@@ -44,7 +44,6 @@ const DRIFT_FRAMES = 600; // rendered frames compared for drift
 const EMISSION_FRAMES = 1000; // emission-count identity window
 const MATH_FRAMES = 60; // math_penrose glow-on spot check
 const DEFAULT_BASELINE = "scripts/fixtures/meditation-baseline.json";
-const ROOT = new URL("..", import.meta.url).pathname;
 
 type Baseline = {
   meta: {

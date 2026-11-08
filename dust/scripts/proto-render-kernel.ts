@@ -122,7 +122,6 @@ const colors = [
 ];
 
 let frames = 0;
-let diffs = 0;
 
 function runFrame(sw: number, sh: number, n: number, allowDrawLong: boolean): void {
   const scale = rnd(0.5, 8);

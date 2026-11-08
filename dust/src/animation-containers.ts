@@ -1,6 +1,5 @@
 // Animation containers for full-size, opaque rendered frames. Compression is
 // supplied by native PNG or the bundled lossless WebP/AV1 encoders.
-export type Bytes = Uint8Array;
 export type FrameSpec = { width: number; height: number; count: number; delay: number; loop: boolean };
 type PngChunk = { type: string; data: Uint8Array };
 type Box = { type: string; start: number; end: number; data: Uint8Array };
