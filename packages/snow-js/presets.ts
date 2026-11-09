@@ -89,7 +89,7 @@ void main(void) {
 `;
 void FRAGMENT_GLSL__;
 
-export interface Options {
+export type Options = {
   isDark: number,
   gradientIntensity: number,
   iGradient: [number, number, number, number],

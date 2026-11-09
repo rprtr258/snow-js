@@ -51,6 +51,13 @@ export default defineConfig([
       "@typescript-eslint/consistent-type-assertions": ["error", {
         assertionStyle: "never",
       }],
+      "no-restricted-syntax": ["error", {
+        selector: "CallExpression[callee.property.name='forEach']",
+        message: "forEach is prohibited. Use for..of or functional methods with value return.",
+      }, {
+        selector: "TSInterfaceDeclaration",
+        message: "interface is prohibited; use a type alias.",
+      }],
     },
   },
   {

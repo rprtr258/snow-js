@@ -378,6 +378,7 @@ requestAnimationFrame(updateGraph);
 
 /** fullscreen */
 declare global {
+  // eslint-disable-next-line no-restricted-syntax -- declaration merging; a type alias cannot augment Element
   interface Element {
     webkitRequestFullscreen?(): void,
     mozRequestFullScreen?(): void,

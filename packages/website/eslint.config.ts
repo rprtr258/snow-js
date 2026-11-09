@@ -45,6 +45,13 @@ export default defineConfig([
         allowNumber: false,
         allowString: false,
       }],
+      "no-restricted-syntax": ["error", {
+        selector: "CallExpression[callee.property.name='forEach']",
+        message: "forEach is prohibited. Use for..of or functional methods with value return.",
+      }, {
+        selector: "TSInterfaceDeclaration",
+        message: "interface is prohibited; use a type alias.",
+      }],
     },
   },
 ]);

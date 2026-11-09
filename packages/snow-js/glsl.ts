@@ -1,15 +1,15 @@
 export type FieldType = "float" | "int" | "vec2" | "ivec2" | "vec3" | "ivec3" | "vec4" | "ivec4";
 
-interface WindowListenerCallback {
+type WindowListenerCallback = {
   event: string,
   listener: (event: MouseEvent) => void,
   options?: boolean | AddEventListenerOptions,
-}
+};
 
-interface GlOption {
+type GlOption = {
   renderHook: () => void,
   windowListener?: WindowListenerCallback[],
-}
+};
 
 function createShader(ctx: WebGLRenderingContext, type: GLenum, source: string): WebGLShader {
   const shader = ctx.createShader(type);
