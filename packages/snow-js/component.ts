@@ -51,11 +51,11 @@ export class Snow {
           gl.ctx.uniform1f(gl.programInfo.uniforms.time, this._time);
 
           for (const key of keys) {
-            const value = this.options[key]!;
+            const value = this.options[key];
             if (Array.isArray(value)) {
-              gl.ctx.uniform4f(gl.programInfo.uniforms[key]!, value[0], value[1], value[2], value[3]);
+              gl.ctx.uniform4f(gl.programInfo.uniforms[key], value[0], value[1], value[2], value[3]);
             } else {
-              gl.ctx.uniform1f(gl.programInfo.uniforms[key]!, value);
+              gl.ctx.uniform1f(gl.programInfo.uniforms[key], value);
             }
           }
         },

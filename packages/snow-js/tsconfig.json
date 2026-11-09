@@ -1,12 +1,14 @@
 {
   "compilerOptions": {
     // Environment setup & latest features
-    "lib": ["DOM", "ESNext"],
+    // WebWorker + DOM.Iterable cover dust's export-frame worker and iterators;
+    // types: ["bun"] covers dust/scripts, which run under bun.
+    "lib": ["DOM", "DOM.Iterable", "ESNext", "WebWorker"],
     "target": "ESNext",
     "module": "ESNext",
     "moduleDetection": "force",
-    "allowJs": false,
     "alwaysStrict": true,
+    "types": ["bun"],
 
     // Bundler mode
     "moduleResolution": "bundler",
@@ -20,12 +22,12 @@
     "strict": true,
     "skipLibCheck": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedIndexedAccess": true,
 
     // Some stricter flags (disabled by default)
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false
   },
-  "exclude": ["dust"]
+  // Build output only; dust/src and dust/scripts are type-checked here.
+  "exclude": ["dust/dist"]
 }

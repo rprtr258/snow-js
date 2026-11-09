@@ -9,8 +9,7 @@ export default defineConfig([
   },
   {
     // snow-js sources: strict house style, type-checked against tsconfig.json.
-    // dust/ is a separate strict project (tsconfig.dust.json) with its own
-    // lighter ruleset below.
+    // dust/ uses a lighter ruleset below.
     files: ["**/*.ts", "*.ts"],
     ignores: ["dust/**"],
     languageOptions: {

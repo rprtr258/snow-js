@@ -11,7 +11,7 @@
   },
   "scripts": {
     "dev:website": "bun run dev --filter=./website",
-    "lint": "eslint '**/*.{ts,json}' && tsc -p tsconfig.json && tsc -p tsconfig.dust.json && knip",
+    "lint": "eslint '**/*.{ts,json}' && tsc -p tsconfig.json && knip",
     "lint:fix": "eslint '**/*.{ts,json}' --fix",
     "test": "bun test",
     "build:dust": "cd dust && bun run scripts/build.ts",
