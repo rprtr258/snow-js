@@ -5,7 +5,6 @@
   // effects/dust/scripts/*.ts tools are entry points too. The package.json
   // exports (index.ts) is an entry point as well.
   "entry": [
-    "eslint.config.ts",
     "effects/dust/src/render-worker.ts",
     "effects/dust/src/*.test.ts",
     "effects/dust/scripts/*.ts",

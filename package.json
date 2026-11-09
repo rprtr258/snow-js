@@ -1,14 +1,15 @@
 {
-  "name": "snow-js-workspace",
+  "name": "@rprtr258/snow-js-monorepo",
   "version": "0.0.0",
+  "private": true,
   "workspaces": ["packages/*"],
   "scripts": {
     "check": "bun check .",
     "check:wasm": "cd ./packages/snow-js/effects/dust && bun scripts/build-render-kernel.ts --check",
-    "dev:website": "cd ./packages/website && bun dev",
-    "lint": "cd ./packages/snow-js && bun lint && cd ../website && bun lint",
-    "typecheck": "cd ./packages/snow-js && bun typecheck && cd ../website && bun typecheck",
-    "lint:fix": "cd ./packages/snow-js && bun lint:fix && cd ../website && bun lint:fix"
+    "dev:website": "bun run --filter='./packages/website' dev",
+    "lint": "bun run --filter='./packages/*' lint",
+    "typecheck": "bun run --filter='./packages/*' typecheck",
+    "lint:fix": "bun run --filter='./packages/*' lint:fix"
   },
   "devDependencies": {
   }
