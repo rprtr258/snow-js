@@ -1,5 +1,5 @@
 {
-  "name": "snow-js",
+  "name": "@rprtr258/snow-js",
   "module": "index.ts",
   "type": "module",
   "exports": {

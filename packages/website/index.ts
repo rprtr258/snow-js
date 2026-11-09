@@ -1,7 +1,7 @@
 import {Pane} from "tweakpane";
 import type {FolderApi} from "tweakpane";
 import * as EssentialsPlugin from "@tweakpane/plugin-essentials";
-import {createEffect, EFFECTS, getEffect, type EffectInstance} from "snow-js";
+import {createEffect, EFFECTS, getEffect, type EffectInstance} from "@rprtr258/snow-js";
 import {buildEffectForm} from "./form.ts";
 
 const mainContainer = document.querySelector<HTMLDivElement>(".container")!;

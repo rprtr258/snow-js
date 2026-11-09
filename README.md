@@ -1,4 +1,4 @@
-# snow-js
+# @rprtr258/snow-js
 
 A browser effects library where every visual effect — falling snow, a
 psychedelic tunnel, a Noita-style dust simulation — is a self-contained
@@ -22,7 +22,7 @@ file plus a registry entry, with no per-effect frontend code.
   portals, objects and math figures).
 
 ```ts
-import {createEffect} from "snow-js";
+import {createEffect} from "@rprtr258/snow-js";
 
 const instance = createEffect(container, "snow", {speed: 5}); // checked against snow's schema
 instance.start();
@@ -35,7 +35,7 @@ instance.unmount();
 Add the library to a project:
 
 ```bash
-bun add snow-js   # or: npm i snow-js
+bun add @rprtr258/snow-js   # or: npm i @rprtr258/snow-js
 ```
 
 or straight from git:

@@ -9,7 +9,7 @@ import {
   type KeyedSpec,
   type OptionValues,
   type SelectEntries,
-} from "snow-js";
+} from "@rprtr258/snow-js";
 
 type Blade = {hidden: boolean};
 type Tracked = {spec: KeyedSpec, blade: Blade, baseHidden?: () => boolean};
