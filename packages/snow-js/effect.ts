@@ -5,7 +5,7 @@
 export type SelectEntry<V extends string = string> = {value: V, label: string};
 export type SelectGroup<V extends string = string> = {label: string, entries: SelectEntry<V>[]};
 // Select choices, optionally grouped; a function recomputes them from the
-// current values (e.g. dust's effect list depends on its collection).
+// current values (e.g. noita's effect list depends on its collection).
 export type SelectEntries<V extends string = string> =
   | SelectEntry<V>[]
   | SelectGroup<V>[]

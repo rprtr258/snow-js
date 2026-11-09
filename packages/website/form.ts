@@ -148,7 +148,7 @@ export function buildEffectForm(
     applyVisibility();
   }
 
-  // Dynamic selects may yield different choices (e.g. dust's effect list
+  // Dynamic selects may yield different choices (e.g. noita's effect list
   // depends on its collection); when they change, the form is rebuilt and an
   // out-of-date value resets to the first available entry.
   function resolveSelects(pending: OptionValues): void {

@@ -1,4 +1,4 @@
-// Dust effect definition: every Noita portal, catalog object/image effect and
+// Noita effect definition: every Noita portal, catalog object/image effect and
 // original math figure exposed through the abstract effect registry. The two
 // selection levels (collection, effect) are ordinary select options; the
 // effect list recomputes from the chosen collection.
@@ -14,7 +14,7 @@ import {
   type SelectEntry,
   type SelectGroup,
 } from "../../effect.ts";
-import {Dust, type DustCollection} from "./src/embed.ts";
+import {Noita, type NoitaCollection} from "./src/embed.ts";
 import {EFFECTS as PORTAL_EFFECTS} from "./src/portal-physics.ts";
 import {MATH_EFFECTS, MATH_GROUPS} from "./src/math-figures.ts";
 import {CATALOG_EFFECTS, CATALOG_GROUP_LABELS} from "./src/effect-metadata.ts";
@@ -46,7 +46,7 @@ function mathGroups(): SelectGroup[] {
 }
 
 const options = {
-  collection: select<DustCollection>("game", {
+  collection: select<NoitaCollection>("game", {
     label: "collection",
     entries: [
       {value: "game", label: "Noita effects"},
@@ -88,10 +88,10 @@ const options = {
   y: num(0, {label: "worldY", min: -1e7, max: 1e7}),
   restart: action("restart", (instance) => instance.restart?.()),
 };
-type DustValues = InferOptions<typeof options>;
+type NoitaValues = InferOptions<typeof options>;
 
 export default defineEffect({
-  label: "Dust",
+  label: "Noita",
   options,
-  create: (el, values: DustValues) => new Dust(el, values),
+  create: (el, values: NoitaValues) => new Noita(el, values),
 });

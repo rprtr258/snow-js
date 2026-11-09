@@ -24,9 +24,9 @@ async function loadEmbedRasterModule(): Promise<WebAssembly.Module | null> {
   }
 }
 
-export type DustCollection = "game" | "math";
-export type DustOptions = {
-  collection: DustCollection;
+export type NoitaCollection = "game" | "math";
+export type NoitaOptions = {
+  collection: NoitaCollection;
   effect: string;
   speed: number;
   zoom: number;
@@ -54,7 +54,7 @@ export type DustOptions = {
 };
 // The effect definition's option schema is the source of defaults; these are
 // only the residual fallbacks for keys a caller may omit.
-const defaults: DustOptions = {
+const defaults: NoitaOptions = {
   collection: "game",
   effect: "meditation",
   speed: 1,
@@ -86,7 +86,7 @@ function loadCatalog(): Promise<Catalog> {
       new URL("../static/assets/effects.json", import.meta.url),
     );
     if (!response.ok)
-      throw new Error("dust: effect assets could not be loaded");
+      throw new Error("noita: effect assets could not be loaded");
     return await response.json() as Catalog;
   })();
   return catalogPromise;
@@ -96,7 +96,7 @@ async function fetchBin(): Promise<ArrayBuffer> {
     new URL("../static/assets/effects.bin", import.meta.url),
   );
   if (!response.ok)
-    throw new Error("dust: effect assets could not be loaded");
+    throw new Error("noita: effect assets could not be loaded");
   return await response.arrayBuffer();
 }
 
@@ -168,8 +168,8 @@ export function computeDensity(fullscreen: boolean, density: number, scale: numb
   return density * (fullscreen ? scale * 2 : 1);
 }
 
-export class Dust {
-  options: DustOptions;
+export class Noita {
+  options: NoitaOptions;
   private container: Element;
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D | null;
@@ -187,7 +187,7 @@ export class Dust {
   private observer: ResizeObserver | null = null;
   private rafId: number | null = null;
 
-  constructor(container: Element, options: Partial<DustOptions> = {}) {
+  constructor(container: Element, options: Partial<NoitaOptions> = {}) {
     this.options = {...defaults, ...options};
     this.container = container;
     this.canvas = document.createElement("canvas");
@@ -326,7 +326,7 @@ export class Dust {
       this.busy = this.pending > 0;
     }
     if (data.type === "error") {
-      if (data.message) console.error("dust:", data.message);
+      if (data.message) console.error("noita:", data.message);
       this._running = false;
       return;
     }
@@ -407,7 +407,7 @@ export class Dust {
     if (!known) {
       // An unknown key would make makeSimulation() throw in the runtime and
       // take the animation down; keep the current effect instead.
-      console.warn(`dust: unknown effect ${JSON.stringify(key)}; keeping the current one.`);
+      console.warn(`noita: unknown effect ${JSON.stringify(key)}; keeping the current one.`);
       return;
     }
     this.revision++;
@@ -421,11 +421,11 @@ export class Dust {
     });
   }
 
-  update(options: Partial<DustOptions>) {
+  update(options: Partial<NoitaOptions>) {
     const previous = this.options;
     this.options = {...previous, ...options};
     if (!this.ready) return;
-    const replayKeys: (keyof DustOptions)[] = [
+    const replayKeys: (keyof NoitaOptions)[] = [
       "collection",
       "effect",
       "seed",

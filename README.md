@@ -18,7 +18,7 @@ file plus a registry entry, with no per-effect frontend code.
   inside each effect.
 - **Zero runtime dependencies.** Ships as TypeScript source.
 - **Three effects built in.** `snow` (flat snow + layered `snowfall`
-  blizzard preset), `creation` (psychedelic tunnel), `dust` (Noita-style
+  blizzard preset), `creation` (psychedelic tunnel), `noita` (Noita-style
   portals, objects and math figures).
 
 ```ts
@@ -86,7 +86,7 @@ That is all: the website picks the effect up in its dropdown and renders its
 form automatically. An effect instance implements `start` / `stop` / `update`
 / `unmount` (plus optional `restart`); everything else — WebGL plumbing,
 worker pipelines, asset loading — is the effect's internal business. Async
-loading (dust's wasm/catalog assets) happens inside the instance; the registry
+loading (noita's wasm/catalog assets) happens inside the instance; the registry
 itself is synchronous.
 
 ## Structure
@@ -104,7 +104,7 @@ packages/snow-js/
       snowfall.ts      the snowfall shader + options, used by snow's
                        "snowfall" preset (not a standalone effect)
     creation/          "Creation" — psychedelic tunnel (pouet 57245)
-    dust/              "Dust" — Noita portals, objects, original math figures
+    noita/             "Noita" — Noita portals, objects, original math figures
       src/             ported simulation + software renderer + embed viewer
       static/assets/   checked-in effect catalog (effects.json/bin) + wasm
 ```
@@ -116,8 +116,8 @@ bun install
 bun run dev:website   # website with the tweakpane playground
 bun run lint          # eslint + knip (both packages)
 bun run typecheck     # both packages
-cd packages/snow-js && bun test   # dust kernels, render snapshots, schema tests
+cd packages/snow-js && bun test   # noita kernels, render snapshots, schema tests
 ```
 
-Dust's browser side is its embed viewer (effects/dust/src/embed.ts); the
+Noita's browser side is its embed viewer (effects/noita/src/embed.ts); the
 simulation and raster code are untouched by the registry layer.

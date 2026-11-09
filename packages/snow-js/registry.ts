@@ -1,13 +1,13 @@
 // The effect registry: every effect the library ships, in dropdown order.
 import type {EffectDefinition, EffectInstance, OptionValues} from "./effect.ts";
 import creation from "./effects/creation/index.ts";
-import dust from "./effects/dust/index.ts";
+import noita from "./effects/noita/index.ts";
 import snow from "./effects/snow/index.ts";
 
 export const EFFECTS = {
   snow,
   creation,
-  dust,
+  noita,
 };
 
 export type EffectKey = (keyof typeof EFFECTS);

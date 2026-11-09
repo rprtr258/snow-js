@@ -1,11 +1,11 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  // bun test files and the manually run effects/dust/scripts/*.ts tools are
+  // bun test files and the manually run effects/noita/scripts/*.ts tools are
   // entry points. The package.json exports (index.ts) is an entry point as
   // well.
   "entry": [
-    "effects/dust/src/*.test.ts",
-    "effects/dust/scripts/*.ts",
+    "effects/noita/src/*.test.ts",
+    "effects/noita/scripts/*.ts",
     "*.test.ts"
   ],
   "project": ["*.ts", "effects/**/*.ts"]

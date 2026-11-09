@@ -31,7 +31,7 @@
     "effects",
     "!effects/**/*.test.ts",
     "!effects/**/__snapshots__",
-    "!effects/dust/scripts"
+    "!effects/noita/scripts"
   ],
   "scripts": {
     "lint": "eslint '**/*.{ts,json}' && knip",

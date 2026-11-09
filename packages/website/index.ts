@@ -52,7 +52,7 @@ function activate(key: string): void {
   if (def === undefined)
     return;
   const instance = createEffect(effectContainer, key);
-  // Dust renders its own background; shader effects ignore the key.
+  // Noita renders its own background; shader effects ignore the key.
   instance.update({background: backgroundConfig.color});
   instance.start();
   if (def.options.length > 0) {
