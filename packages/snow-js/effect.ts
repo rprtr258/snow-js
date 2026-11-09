@@ -87,9 +87,7 @@ export function num(value: number, opts: Omit<NumberSpec, "kind" | "default">): 
 export function bool(value: boolean, opts: Omit<BooleanSpec, "kind" | "default">): BooleanSpec {
   return {kind: "boolean", default: value, ...opts};
 }
-export function color(value: string, opts: Omit<ColorSpec, "kind" | "default">): ColorSpec<string>;
-export function color(value: null, opts: Omit<ColorSpec, "kind" | "default">): ColorSpec<string | null>;
-export function color(value: string | null, opts: Omit<ColorSpec, "kind" | "default">): ColorSpec {
+export function color<T extends string | null>(value: T, opts: Omit<ColorSpec, "kind" | "default">): ColorSpec<T> {
   return {kind: "color", default: value, ...opts};
 }
 export function select<V extends string>(value: V, opts: Omit<SelectSpec<V>, "kind" | "default">): SelectSpec<V> {

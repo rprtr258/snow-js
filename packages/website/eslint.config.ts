@@ -51,6 +51,12 @@ export default defineConfig([
       }, {
         selector: "TSInterfaceDeclaration",
         message: "interface is prohibited; use a type alias.",
+      }, {
+        selector: "TSDeclareFunction",
+        message: "Function overloads are prohibited; use a single signature.",
+      }, {
+        selector: "TSEmptyBodyFunctionExpression",
+        message: "Method overloads are prohibited; use a single signature.",
       }],
     },
   },
