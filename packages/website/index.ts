@@ -71,22 +71,18 @@ const cardConfig = {
 
 const pane = new Pane({
   document,
-  expanded: true,
-  title: document.title,
 });
 pane.registerPlugin(EssentialsPlugin);
 
-pane.addBinding(effectState, "effect", {
-  label: "effect",
-  options: Object.fromEntries(Object.entries(EFFECTS).map(([key, def]) => [def.label, key])),
-}).on("change", ({value}) => {
-  activate(value);
-});
-activate(effectState.effect);
-
-pane.addBinding(cardConfig, "show", {label: "show card"}).on("change", ({value}) => {
-  mainContainer.style.display = value ? "block" : "none";
-});
+/** monitors */
+const monitors = pane.addFolder({title: "monitors", expanded: true});
+const fpsGraph = monitors.addBlade({view: "fpsgraph", label: "fps"}) as unknown as {begin(): void, end(): void};
+function updateGraph() {
+  fpsGraph.begin();
+  fpsGraph.end();
+  requestAnimationFrame(updateGraph);
+}
+requestAnimationFrame(updateGraph);
 
 /** background */
 const background = pane.addFolder({title: "background", expanded: false});
@@ -102,15 +98,19 @@ background.addBinding(backgroundConfig, "position").on("change", ({value}) => { 
 background.addBinding(backgroundConfig, "repeat").on("change", ({value}) => { effectContainer.style.backgroundRepeat = value; });
 applyBackgroundImage();
 
-/** monitors */
-const monitors = pane.addFolder({title: "monitors", expanded: true});
-const fpsGraph = monitors.addBlade({view: "fpsgraph", label: "fps"}) as unknown as {begin(): void, end(): void};
-function updateGraph() {
-  fpsGraph.begin();
-  fpsGraph.end();
-  requestAnimationFrame(updateGraph);
-}
-requestAnimationFrame(updateGraph);
+/** snow-js */
+const snowJs = pane.addFolder({title: "snow-js", expanded: true});
+snowJs.addBinding(cardConfig, "show", {label: "show card"}).on("change", ({value}) => {
+  mainContainer.style.display = value ? "block" : "none";
+});
+
+snowJs.addBinding(effectState, "effect", {
+  label: "effect",
+  options: Object.fromEntries(Object.entries(EFFECTS).map(([key, def]) => [def.label, key])),
+}).on("change", ({value}) => {
+  activate(value);
+});
+activate(effectState.effect);
 
 /** fullscreen */
 declare global {
