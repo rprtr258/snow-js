@@ -1,6 +1,6 @@
 import {/*FolderApi, */Pane} from "tweakpane";
 import * as EssentialsPlugin from "@tweakpane/plugin-essentials";
-import {Snow, type Options, type PresetKey, type SnowOptions} from "snow-js";
+import {Snow, type Options, type SnowOptions} from "snow-js";
 import {
   Dust,
   dustDefaults,
@@ -73,7 +73,7 @@ const snow2Options = {
   speed: .6,
 };
 
-const snowState: {preset: PresetKey} = {preset: "default"};
+const snowState: {preset: "default" | "snow2"} = {preset: "default"};
 
 function toSnowOptions(): SnowOptions {
   switch (snowState.preset) {
@@ -81,8 +81,6 @@ function toSnowOptions(): SnowOptions {
       return toInner();
     case "snow2":
       return {...snow2Options};
-    case "creation":
-      return {};
   }
 }
 
@@ -123,7 +121,7 @@ const cardConfig = {
 };
 
 /** active effect */
-const effectState: {effect: "snow" | "dust"} = {effect: "snow"};
+const effectState: {effect: "snow" | "dust" | "creation"} = {effect: "snow"};
 let dust: Dust | null = null;
 let dustBackgroundReset = false;
 
@@ -165,7 +163,9 @@ function toDustOptions(): Partial<DustOptions> {
 function activateSnow() {
   dust?.unmount();
   dust = null;
-  snow.start();
+  // The snow variable may hold the creation instance; rebuild the user's
+  // snow from state instead of resuming.
+  mountSnow();
   snowFolder.hidden = false;
   dustFolder.hidden = true;
 }
@@ -184,6 +184,15 @@ function activateDust() {
   }
   dust.start();
 }
+function activateCreation() {
+  dust?.unmount();
+  dust = null;
+  snow.unmount();
+  snow = new Snow(effectContainer, commonOptions.speed, {}, false, "creation");
+  snow.start();
+  snowFolder.hidden = true;
+  dustFolder.hidden = true;
+}
 
 const pane = new Pane({
   document,
@@ -201,12 +210,15 @@ pane.addBinding(effectState, "effect", {
   options: {
     "Snow": "snow",
     "Dust": "dust",
+    "Creation": "creation",
   },
 }).on("change", ({value}) => {
   if (value === "snow") {
     activateSnow();
-  } else {
+  } else if (value === "dust") {
     activateDust();
+  } else {
+    activateCreation();
   }
 });
 
@@ -220,7 +232,6 @@ function rebuildSnowControls() {
     options: {
       "Default": "default",
       "Other snow example": "snow2",
-      "Creation": "creation",
     },
   }).on("change", ({value}) => {
     snowState.preset = value;
@@ -243,8 +254,6 @@ function rebuildSnowControls() {
       snowFolder.addBinding(snow2Options, "depth", {min: .1, max: .5});
       snowFolder.addBinding(snow2Options, "width", {min: .3, max: .8});
       snowFolder.addBinding(snow2Options, "speed", {min: .6, max: 1.5});
-      break;
-    case "creation":
       break;
   }
   snowFolder.addBinding(commonOptions, "speed", {min: 0, max: 20});
