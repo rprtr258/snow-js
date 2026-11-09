@@ -38,7 +38,7 @@ vec4 mainImage(in vec2 fragCoord) {
     float edge = .005+.05*min(.5*abs(fi-5.-dof),1.);
     acc += vec3(smoothstep(edge,-edge,d)*(r.x/(1.+.02*fi*depth)));
   }
-  return vec4(vec3(acc),1.0);
+  return vec4(vec3(acc), acc.r);
 }
 
 void main(void) {
