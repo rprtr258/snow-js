@@ -1,9 +1,9 @@
 // Two presets in one effect: flat snow
 // (https://www.shadertoy.com/view/4sX3z2) and layered snowfall, whose shader
-// and options live separately in ../snowfall. The preset option picks which
+// and options live in ./snowfall.ts. The preset option picks which
 // shader runs; option visibility follows it.
 import {bool, defineEffect, num, select, type EffectInstance, type InferOptions, type OptionValues} from "../../effect.ts";
-import snowfall, {options as snowfallOptions} from "../snowfall/index.ts";
+import snowfall, {options as snowfallOptions} from "./snowfall.ts";
 import {createShaderEffect, type UniformMap} from "../snow-runner.ts";
 
 const FRAGMENT_GLSL = `

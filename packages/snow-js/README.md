@@ -76,7 +76,7 @@ packages/snow-js/
     snow/              "Snow" — preset "snow": flat snow
                        (shadertoy 4sX3z2); preset "snowfall": layered
                        blizzard (shadertoy ldsGDn)
-    snowfall/          the snowfall shader + options, used by snow's
+      snowfall.ts      the snowfall shader + options, used by snow's
                        "snowfall" preset (not a standalone effect)
     creation/          "Creation" — psychedelic tunnel (pouet 57245)
     dust/              "Dust" — Noita portals, objects, original math figures
