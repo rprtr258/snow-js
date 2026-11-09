@@ -35,7 +35,7 @@ export function loadHarness(): Harness {
   return { catalog, resources, buffer, kernelModule, renderKernelModule };
 }
 
-// The fullscreen replay's render options after the worker's
+// The fullscreen replay's render options after the runtime's
 // normalizeOptions/renderOptions round-trip: color null, background 0.
 export const MEDITATION_RENDER = {
   core: true,
@@ -47,8 +47,8 @@ export const MEDITATION_RENDER = {
   portalSprite: false,
 } as const;
 
-// The fullscreen replay configuration. The worker's
-// ViewerRuntime.restart additionally forces retainInvisible: false on every
+// The fullscreen replay configuration. ViewerRuntime.restart additionally
+// forces retainInvisible: false on every
 // replay. density tracks the world→pixel scale (replay.density = scale*2).
 // cullInvisible is always on; it is output-invariant (the
 // dropped particles render nothing, interact with nothing, consume no RNG),

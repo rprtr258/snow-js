@@ -1,5 +1,5 @@
-// Single-effect preview resolution, shared by the worker and the main-thread
-// fallback. The software rasterizer draws at RESOLUTION_SCALE × the logical
+// Single-effect preview resolution, shared by the viewer runtime and the
+// embed. The software rasterizer draws at RESOLUTION_SCALE × the logical
 // effect size: the render buffer is the display resolution (derived, never a
 // fixed 480×320 literal) and the world→pixel transform is scaled to match, so
 // figures keep their on-screen size while gaining detail.

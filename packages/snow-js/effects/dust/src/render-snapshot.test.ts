@@ -1,5 +1,5 @@
 // Headless render tests. The software renderer is DOM-free, so the shared
-// ViewerRuntime pipeline (worker, main-thread fallback and these tests) runs
+// ViewerRuntime pipeline (the embed and these tests) runs
 // in bun and its RGBA output can be pinned byte-exactly with snapshots: any
 // change to simulation or rasterization that alters a single rendered pixel
 // fails here. Review the .snap diff, then run `bun test -u` to accept the

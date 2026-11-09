@@ -1,11 +1,9 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  // effects/dust/src/render-worker.ts is loaded via new Worker(new URL(...))
-  // in embed.ts, so knip cannot see it; bun test files and the manually run
-  // effects/dust/scripts/*.ts tools are entry points too. The package.json
-  // exports (index.ts) is an entry point as well.
+  // bun test files and the manually run effects/dust/scripts/*.ts tools are
+  // entry points. The package.json exports (index.ts) is an entry point as
+  // well.
   "entry": [
-    "effects/dust/src/render-worker.ts",
     "effects/dust/src/*.test.ts",
     "effects/dust/scripts/*.ts",
     "*.test.ts"

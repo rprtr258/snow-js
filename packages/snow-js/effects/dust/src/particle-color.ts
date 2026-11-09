@@ -1,5 +1,5 @@
-// Presentation-only recolor settings shared by both pages, both workers and
-// the headless tests. Colors travel as "#rrggbb" strings or null (original).
+// Presentation-only recolor settings shared by both pages and the headless
+// tests. Colors travel as "#rrggbb" strings or null (original).
 export function validateColor(value: unknown) {
   if (value === null || value === undefined) return null;
   if (typeof value !== "string" || !/^#[0-9a-f]{6}$/i.test(value))

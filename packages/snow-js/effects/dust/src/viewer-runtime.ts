@@ -1,4 +1,4 @@
-// Shared by the browser worker, main-thread fallback, and headless Node tests.
+// Shared by the embed viewer and headless Node tests.
 import { decodeAssets, makeSimulation } from "./effect-simulation";
 import { SoftwareRenderer } from "./software-renderer";
 import { packColor, validateColor } from "./particle-color";

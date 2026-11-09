@@ -1,7 +1,7 @@
-// Embeddable fullscreen viewer for the snow-js website. Runs the worker
-// pipeline, sizes the render buffer to the host element's aspect ratio and
-// exposes a Snow-like class API. The ported simulation and raster code are
-// untouched; this module only orchestrates.
+// Embeddable fullscreen viewer for the snow-js website. Runs the simulation
+// and software renderer on the main thread, sizes the render buffer to the
+// host element's aspect ratio and exposes a Snow-like class API. The ported
+// simulation and raster code are untouched; this module only orchestrates.
 import { ViewerRuntime } from "./viewer-runtime";
 import { EFFECTS } from "./portal-physics";
 import { MATH_EFFECTS } from "./math-figures";
@@ -78,7 +78,7 @@ const defaults: DustOptions = {
 };
 
 // Catalog metadata (effects.json), shared by every consumer; the effect data
-// (effects.bin) is fetched per viewer because it is transferred to its worker.
+// (effects.bin) is fetched per viewer because the runtime takes ownership of it.
 let catalogPromise: Promise<Catalog> | null = null;
 function loadCatalog(): Promise<Catalog> {
   catalogPromise ??= (async () => {
@@ -100,8 +100,8 @@ async function fetchBin(): Promise<ArrayBuffer> {
   return await response.arrayBuffer();
 }
 
-type WorkerRequest = {
-  type: "init" | "restart" | "frame" | "view";
+type RuntimeRequest = {
+  type: "restart" | "frame" | "view";
   width?: number;
   height?: number;
   centerX?: number;
@@ -116,10 +116,6 @@ type WorkerRequest = {
   paused?: boolean;
   redraw?: boolean;
   mathTrailScale?: number;
-  catalog?: Catalog;
-  buffer?: ArrayBuffer;
-  kernelModule?: WebAssembly.Module | null;
-  renderKernelModule?: WebAssembly.Module | null;
 };
 type PreviewMessage = {
   type: string;
@@ -177,15 +173,9 @@ export class Dust {
   private container: Element;
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D | null;
-  private worker: Worker | null = null;
   private inline: ViewerRuntime | null = null;
   private catalog: Catalog | null = null;
-  private kernelModule: WebAssembly.Module | null = null;
-  private renderKernelModule: WebAssembly.Module | null = null;
   private resizeTimer: ReturnType<typeof setTimeout> | null = null;
-  // Init-time effects.bin; detached once transferred to the worker, and
-  // re-fetched by the main-thread fallback when the worker took it.
-  private initBuffer: ArrayBuffer | null = null;
   private busy = false;
   private pending = 0;
   private ready = false;
@@ -232,7 +222,7 @@ export class Dust {
     );
   }
 
-  private view(): WorkerRequest {
+  private view(): RuntimeRequest {
     return {type: "view", ...this.geometry()};
   }
 
@@ -276,67 +266,14 @@ export class Dust {
       ]);
       if (this.disposed) return;
       this.catalog = catalog;
-      this.kernelModule = kernelModule;
-      this.renderKernelModule = renderKernelModule;
-      const view = this.view();
-      const init: WorkerRequest = {
-        type: "init",
-        catalog,
-        buffer: bin,
-        kernelModule,
-        renderKernelModule,
-        width: view.width,
-        height: view.height,
-        scale: view.scale,
-        revision: this.revision,
-        replay: this.replay(),
-        options: this.rawOptions(),
-      };
-      try {
-        this.worker = new Worker(
-          new URL("./render-worker.ts", import.meta.url),
-          {type: "module"},
-        );
-        this.worker.onmessage = ({data}) => this.receive(data as PreviewMessage);
-        this.worker.onerror = (event) => {
-          event.preventDefault();
-          void this.fallback(event.message);
-        };
-        this.send(init);
-      } catch (error) {
-        await this.fallback(error);
-      }
-    } catch (error) {
-      if (!this.disposed)
-        console.error((error as Error).message);
-    }
-  }
-
-  // Module workers unavailable or disallowed: run the same software renderer
-  // on the main thread.
-  private async fallback(error: unknown) {
-    if (this.disposed) return;
-    this.worker?.terminate();
-    this.worker = null;
-    this.busy = false;
-    this.pending = 0;
-    try {
-      const catalog = await loadCatalog();
-      if (this.disposed) return;
       const message = this.view();
-      // A failed worker may already have taken ownership of its input buffer.
-      const bytes = this.initBuffer && this.initBuffer.byteLength
-        ? this.initBuffer
-        : await fetchBin();
-      const {ViewerRuntime} = await import("./viewer-runtime");
-      if (this.disposed) return;
       this.inline = new ViewerRuntime(
         catalog,
-        bytes,
+        bin,
         message.width!,
         message.height!,
-        this.kernelModule,
-        {scale: message.scale!, renderKernelModule: this.renderKernelModule},
+        kernelModule,
+        {scale: message.scale!, renderKernelModule},
       );
       this.inline.restart(this.replay(), this.revision);
       const result = this.inline.frame({
@@ -345,24 +282,14 @@ export class Dust {
         options: this.rawOptions(),
       });
       this.receive({...result, type: "init", pixels: result.pixels?.buffer} as PreviewMessage);
-      if (error)
-        console.warn("dust: worker unavailable; rendering on the main thread.", error);
-    } catch (failure) {
+    } catch (error) {
       if (!this.disposed)
-        console.error((failure as Error).message);
+        console.error((error as Error).message);
     }
   }
 
-  private send(message: WorkerRequest) {
+  private send(message: RuntimeRequest) {
     if (this.disposed) return;
-    if (this.worker) {
-      if (message.type === "init") this.initBuffer = message.buffer ?? null;
-      const transfer: ArrayBufferLike[] = [];
-      if (message.buffer) transfer.push(message.buffer);
-      if (message.recycle) transfer.push(message.recycle);
-      this.worker.postMessage(message, transfer as Transferable[]);
-      return;
-    }
     const inline = this.inline;
     if (!inline) return;
     try {
@@ -408,18 +335,19 @@ export class Dust {
       const bytes = data.pixels as ArrayBuffer;
       // A resize between request and response changes the canvas size; skip
       // the stale-size frame instead of throwing on the blit.
-      if (data.revision === this.revision && this.ctx && bytes.byteLength === this.canvas.width * this.canvas.height * 4)
+      if (data.revision === this.revision && this.ctx && bytes.byteLength === this.canvas.width * this.canvas.height * 4) {
         this.ctx.putImageData(
           new ImageData(new Uint8ClampedArray(bytes), this.canvas.width, this.canvas.height),
           0,
           0,
         );
+      }
       this.recycled = data.pixels;
     }
     if (data.revision !== this.revision) return;
     if (data.type === "init") {
       this.ready = true;
-      // A resize during async init left canvas and worker out of sync.
+      // A resize during async init left canvas and runtime out of sync.
       this.applyView();
     }
   }
@@ -477,7 +405,7 @@ export class Dust {
       Object.prototype.hasOwnProperty.call(MATH_EFFECTS, key) ||
       (this.catalog && Object.prototype.hasOwnProperty.call(this.catalog.effects, key));
     if (!known) {
-      // An unknown key would make makeSimulation() throw in the worker and
+      // An unknown key would make makeSimulation() throw in the runtime and
       // take the animation down; keep the current effect instead.
       console.warn(`dust: unknown effect ${JSON.stringify(key)}; keeping the current one.`);
       return;
@@ -584,8 +512,6 @@ export class Dust {
       this.resizeTimer = null;
     }
     this.stop();
-    this.worker?.terminate();
-    this.worker = null;
     this.inline = null;
     this.observer?.disconnect();
     this.observer = null;
