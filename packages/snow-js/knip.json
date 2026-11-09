@@ -1,16 +1,17 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  // dust's browser entries mirror dust/scripts/build.ts ENTRIES (the worker
-  // URLs must stay in sync with it); bun test files and the manually run
-  // dust/scripts/*.ts tools are entry points too. The package.json exports
-  // (index.ts and dust/src/embed.ts) are entry points as well.
+  // dust's browser entries mirror effects/dust/scripts/build.ts ENTRIES (the
+  // worker URLs must stay in sync with it); bun test files and the manually
+  // run effects/dust/scripts/*.ts tools are entry points too. The package.json
+  // exports (index.ts) is an entry point as well.
   "entry": [
     "eslint.config.ts",
-    "dust/src/meditation.ts",
-    "dust/src/render-worker.ts",
-    "dust/src/*.test.ts",
-    "dust/scripts/*.ts"
+    "effects/dust/src/meditation.ts",
+    "effects/dust/src/render-worker.ts",
+    "effects/dust/src/*.test.ts",
+    "effects/dust/scripts/*.ts",
+    "*.test.ts"
   ],
-  "project": ["*.ts", "dust/src/**/*.ts", "dust/scripts/**/*.ts"],
+  "project": ["*.ts", "effects/**/*.ts"],
   "ignoreBinaries": ["wat2wasm"]
 }

@@ -9,9 +9,9 @@ export default defineConfig([
   },
   {
     // snow-js sources: strict house style, type-checked against tsconfig.json.
-    // dust/ uses a lighter ruleset below.
+    // effects/dust/ uses a lighter ruleset below.
     files: ["**/*.ts", "*.ts"],
-    ignores: ["dust/**"],
+    ignores: ["effects/dust/**"],
     languageOptions: {
       parserOptions: {
         parser: tseslint.parser,
@@ -22,11 +22,11 @@ export default defineConfig([
   },
   ...tseslint.configs.recommendedTypeChecked.map((config) => ({
     ...config,
-    ignores: ["dust/**"],
+    ignores: ["effects/dust/**"],
   })),
   {
     files: ["**/*.ts", "*.ts"],
-    ignores: ["dust/**"],
+    ignores: ["effects/dust/**"],
     plugins: {
       "@stylistic": stylistic,
       import: importPlugin,
@@ -63,7 +63,7 @@ export default defineConfig([
   {
     // dust: the ported sources are strictly typed, so an explicit `any` is a
     // lint error; this is the only rule dust enforces for now.
-    files: ["dust/src/**/*.ts", "dust/scripts/**/*.ts"],
+    files: ["effects/dust/src/**/*.ts", "effects/dust/scripts/**/*.ts"],
     plugins: {"@typescript-eslint": tseslint.plugin},
     languageOptions: {parser: tseslint.parser},
     rules: {"@typescript-eslint/no-explicit-any": "error"},

@@ -1,4 +1,10 @@
-export type FieldType = "float" | "int" | "vec2" | "ivec2" | "vec3" | "ivec3" | "vec4" | "ivec4";
+export const VERTEX_GLSL = `
+attribute vec3 aVertexPosition;
+
+void main() {
+  gl_Position = vec4(aVertexPosition, 1.0);
+}
+`;
 
 type WindowListenerCallback = {
   event: string,

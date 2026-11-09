@@ -1,0 +1,137 @@
+// Flat snowfall over a gradient (https://www.shadertoy.com/view/4sX3z2).
+import {bool, color, defineEffect, num, type InferOptions} from "../../effect.ts";
+import {createShaderEffect, type UniformMap} from "../snow-runner.ts";
+
+const FRAGMENT_GLSL = `
+precision highp float;
+
+uniform float iTime;
+uniform vec2 iResolution;
+uniform vec2 iMouse;
+
+uniform float isDark;
+uniform float gradientIntensity;
+uniform vec4 iGradient;
+uniform float amount;
+uniform float size;
+uniform float opacity;
+
+const int SNOW_LAYERS = 8;
+
+// Construct and return a vec2 with cos(angle) and sin(angle)
+vec2 sincos(float angle) {
+  return vec2(cos(angle), sin(angle));
+}
+
+vec4 blendOver(vec4 src, vec4 dst) {
+  float outA = src.a + dst.a * (1.0 - src.a);
+  vec3 num = src.rgb * src.a + dst.rgb * dst.a * (1.0 - src.a);
+  if (outA > 0.0) {
+    return vec4(num / outA, outA);
+  } else {
+    return vec4(0.0); // fully transparent
+  }
+}
+
+vec4 mainImage(in vec2 fragCoord) {
+  vec2 p = fragCoord.xy / iResolution.x;
+  float snow = 0.0;
+
+  // p += (vec2(-iMouse.x, +iMouse.y) / iResolution - 0.5) / 10.0;
+
+  vec4 gradient = (1.0 - p.y) * gradientIntensity * iGradient;
+
+  for (int k = 0; k < 6; k++) {
+    for (int i = 0; i < SNOW_LAYERS; i++) {
+      float cellSize = 5.0 + float(i) * 3.0;
+      float downSpeed = 0.3 + (sin(iTime * 0.4 + float(k + i * 20)) + 1.0) * 0.00008;
+      vec2 uv = p + vec2(0.01, downSpeed) * vec2(
+        sin((iTime + float(k * 6185)) * 0.6 + float(i)),
+        iTime + float(k * 1352)
+      ) * vec2(5.0, 1.0) / float(i);
+      vec2 uvStep = ceil(uv * cellSize - 0.5) / cellSize;
+      vec2 tmp = fract(sin(vec2((mat2(
+        13.0, 78.0,
+        62.0, 94.0
+      ) + float(k) * mat2(
+        12.0, 315.0,
+        23.0, 95.0
+      )) * uvStep)) * vec2(43758.0, 62159.0) + float(k) * 12.0) - 0.5;
+      vec2 randomMagnitude = sincos(iTime * 2.5) * 0.7 / cellSize;
+      float d = 5.0 * distance((uvStep + vec2(tmp.x * sin(tmp.y), tmp.y) * randomMagnitude.x + vec2(tmp.y, tmp.x) * randomMagnitude.y), uv);
+      float omiVal = fract(sin(dot(uvStep, vec2(32.0, 94.0))) * 31572.0);
+      if (omiVal < amount) {
+        float newd = (tmp.x + 1.0) * 0.4 * clamp(1.9 - d * (15.0 + (tmp.x * 6.3)) * (cellSize / size), 0.0, 1.0);
+        snow += newd * opacity;
+      }
+    }
+  }
+
+  if (isDark < 0.5) {
+    // invertedColor
+    return vec4(-vec3(snow).rgb, snow) + gradient;
+  }
+
+  return blendOver(vec4(snow), gradient);
+}
+
+void main(void) {
+  gl_FragColor = mainImage(gl_FragCoord.xy);
+}
+`;
+
+function hexToVec4(hex: string): [number, number, number, number] {
+  let raw = hex;
+  if (raw.startsWith("#"))
+    raw = raw.slice(1);
+  if (raw.length === 3) {
+    return [
+      parseInt(raw[0] + raw[0], 16) / 255,
+      parseInt(raw[1] + raw[1], 16) / 255,
+      parseInt(raw[2] + raw[2], 16) / 255,
+      1,
+    ];
+  }
+  if (raw.length === 6) {
+    return [
+      parseInt(raw.slice(0, 2), 16) / 255,
+      parseInt(raw.slice(2, 4), 16) / 255,
+      parseInt(raw.slice(4, 6), 16) / 255,
+      1,
+    ];
+  }
+  throw new Error("Invalid hex color");
+}
+
+const options = {
+  speed: num(10, {label: "speed", min: 0, max: 20}),
+  isDark: bool(true, {label: "isDark"}),
+  gradientIntensity: num(0.3, {label: "gradientIntensity", min: 0, max: 1}),
+  gradient: color("#00ccff", {label: "gradient"}),
+  amount: num(0.5, {label: "amount", min: 0.01, max: 0.5}),
+  size: num(1, {label: "size", min: 0.4, max: 2}),
+  opacity: num(1, {label: "opacity", min: 0.3, max: 3}),
+};
+type SnowValues = InferOptions<typeof options>;
+
+function toUniforms(values: SnowValues): UniformMap {
+  return {
+    isDark: values.isDark ? 1 : 0,
+    gradientIntensity: values.gradientIntensity,
+    iGradient: hexToVec4(values.gradient),
+    amount: values.amount,
+    size: values.size,
+    opacity: values.opacity,
+  };
+}
+
+export default defineEffect({
+  label: "Snow",
+  options,
+  create: (el, values) => createShaderEffect(el, {
+    fragment: FRAGMENT_GLSL,
+    values,
+    toUniforms,
+    speedOf: (v) => v.speed,
+  }),
+});

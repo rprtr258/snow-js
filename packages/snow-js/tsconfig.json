@@ -28,6 +28,7 @@
     "noUnusedParameters": true,
     "noPropertyAccessFromIndexSignature": true
   },
-  // Build output only; dust/src and dust/scripts are type-checked here.
-  "exclude": ["dust/dist"]
+  // Build output only; effects/dust/src and effects/dust/scripts are
+  // type-checked here.
+  "exclude": ["effects/dust/dist"]
 }

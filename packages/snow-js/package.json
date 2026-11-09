@@ -3,11 +3,7 @@
   "module": "index.ts",
   "type": "module",
   "exports": {
-    ".": "./index.ts",
-    "./dust/src/embed.ts": {
-      "types": "./dust/src/embed.d.ts",
-      "default": "./dust/src/embed.ts"
-    }
+    ".": "./index.ts"
   },
   "scripts": {
     "dev:website": "bun run dev --filter=./website",
@@ -15,9 +11,9 @@
     "typecheck": "bun check",
     "lint:fix": "eslint '**/*.{ts,json}' --fix",
     "test": "bun test",
-    "build:dust": "cd dust && bun run scripts/build.ts",
-    "dev:dust": "cd dust && bun run scripts/dev.ts",
-    "serve:dust": "cd dust && bun run scripts/serve.ts"
+    "build:dust": "cd effects/dust && bun run scripts/build.ts",
+    "dev:dust": "cd effects/dust && bun run scripts/dev.ts",
+    "serve:dust": "cd effects/dust && bun run scripts/serve.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",

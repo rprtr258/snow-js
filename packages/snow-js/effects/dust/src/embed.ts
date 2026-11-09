@@ -5,7 +5,7 @@
 // orchestrates.
 import { ViewerRuntime } from "./viewer-runtime";
 import { EFFECTS } from "./portal-physics";
-import { MATH_EFFECTS, MATH_GROUPS } from "./math-figures";
+import { MATH_EFFECTS } from "./math-figures";
 import { MATH_TRAIL_SCALE } from "./math-settings";
 import { PREVIEW_HEIGHT, RESOLUTION_SCALE } from "./render-resolution";
 import { Catalog, RawOptions, SimulationOptions } from "./types";
@@ -40,7 +40,9 @@ export type DustOptions = {
   x: number;
   y: number;
 };
-export const dustDefaults: DustOptions = {
+// The effect definition's option schema is the source of defaults; these are
+// only the residual fallbacks for keys a caller may omit.
+const defaults: DustOptions = {
   collection: "game",
   effect: "meditation",
   speed: 1,
@@ -54,8 +56,6 @@ export const dustDefaults: DustOptions = {
   x: 0,
   y: 0,
 };
-export type DustEffectEntry = {key: string; label: string};
-export type DustEffectGroup = {label: string; effects: DustEffectEntry[]};
 
 // Catalog metadata (effects.json), shared by every consumer; the effect data
 // (effects.bin) is fetched per viewer because it is transferred to its worker.
@@ -78,34 +78,6 @@ async function fetchBin(): Promise<ArrayBuffer> {
   if (!response.ok)
     throw new Error("dust: effect assets could not be loaded");
   return await response.arrayBuffer();
-}
-
-// Grouped effect lists for a host UI's dropdowns, mirroring the portal
-// page's populate(): static portals first, then the catalog's own groups.
-export async function dustEffectGroups(): Promise<{
-  game: DustEffectGroup[];
-  math: DustEffectGroup[];
-}> {
-  const catalog = await loadCatalog();
-  const byGroup = (group: string) =>
-    Object.entries(catalog.effects)
-      .filter(([, e]) => e.group === group)
-      .map(([key, e]) => ({key, label: e.label}));
-  const game: DustEffectGroup[] = [
-    {
-      label: "Portals",
-      effects: Object.entries(EFFECTS).map(([key, e]) => ({key, label: e.label})),
-    },
-    {label: "Objects & ambient effects", effects: byGroup("objects")},
-    {label: "Image-driven effects", effects: byGroup("images")},
-  ];
-  const math: DustEffectGroup[] = Object.entries(MATH_GROUPS).map(([key, label]) => ({
-    label,
-    effects: Object.entries(MATH_EFFECTS)
-      .filter(([, e]) => e.group === key)
-      .map(([key, e]) => ({key, label: e.label})),
-  }));
-  return {game, math};
 }
 
 type WorkerRequest = {
@@ -178,7 +150,7 @@ export class Dust {
   private rafId: number | null = null;
 
   constructor(container: Element, options: Partial<DustOptions> = {}) {
-    this.options = {...dustDefaults, ...options};
+    this.options = {...defaults, ...options};
     this.container = container;
     this.canvas = document.createElement("canvas");
     this.canvas.style.display = "block";
