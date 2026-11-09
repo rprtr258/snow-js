@@ -6,7 +6,7 @@ function loopLifetime(sim: PortalSimulation) {
   if (sim.settings) return sim.settings.lifetime;
   if (sim.trailEmission) return sim.trailEmission.lifeMax;
   if (sim.emitters) return Math.max(0, ...sim.emitters.map(e => e.config.lifeMax),
-    ...(sim.spriteEmitters ?? []).map(e => Number(e.config.lifetime ?? 1) + Number(e.config["randomize_lifetime.max"] ?? 0) + Math.max(0, Number(e.config.delay ?? 0))));
+    ...(sim.spriteEmitters ?? []).map(e => Number(e.config["lifetime"] ?? 1) + Number(e.config["randomize_lifetime.max"] ?? 0) + Math.max(0, Number(e.config["delay"] ?? 0))));
   return sim.effect === "eye_room" ? PORTAL_EMITTERS.orbital.lifeMax : PORTAL_EMITTERS.ring.lifeMax;
 }
 

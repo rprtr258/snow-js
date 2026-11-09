@@ -2,7 +2,7 @@
 import { join, normalize } from "node:path";
 
 const root = normalize(new URL("../dist/", import.meta.url).pathname);
-const port = Number(process.env.PORT ?? 3123);
+const port = Number(process.env["PORT"] ?? 3123);
 
 Bun.serve({
   port,

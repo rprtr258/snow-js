@@ -136,7 +136,7 @@ export class GifScene {
       runtime.restart();
       if (looping) {
         this.warmFrames = prepareContinuous(runtime.viewer.simulation);
-        runtime.bounds = figureBounds(runtime.viewer.simulation, catalog, runtime.viewer.resources, 90);
+        runtime.bounds = figureBounds(runtime.viewer.simulation, runtime.viewer.resources, 90);
       }
       const item = runtime.history[runtime.historyCursor];
       item.color = item.gray = config.color ?? "#ffffff";
@@ -170,7 +170,7 @@ export class GifScene {
         this.backgrounds.push(rgb(color));
       });
     } else {
-      const color = config.kind === "demo" ? config.settings?.background : config.options?.background;
+      const color = config.kind === "demo" ? config.settings?.["background"] : config.options?.background;
       context.fillStyle = (typeof color === "string" ? color : null) ?? "#000000"; context.fillRect(0, 0, this.width, this.height);
       this.backgrounds = [rgb(typeof color === "string" ? color : null)];
     }

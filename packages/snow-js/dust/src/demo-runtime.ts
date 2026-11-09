@@ -52,7 +52,6 @@ function randomColor(random: () => number = Math.random) {
 // stays still while they turn. Drifting sparks may leave these bounds.
 export function figureBounds(
   sim: PortalSimulation,
-  catalog: Catalog,
   resources: Resources,
   duration: number | "loop" = 5,
 ): FigureBounds {
@@ -263,7 +262,7 @@ export class DemoRuntime {
     this.exitDirections = [];
     this.viewer.restart({ effect: this.key!, imageOnce: true });
     const sim = this.viewer.simulation;
-    this.bounds = figureBounds(sim, this.viewer.catalog, this.viewer.resources, this.duration);
+    this.bounds = figureBounds(sim, this.viewer.resources, this.duration);
     this.pixelated = !!sim.emissionPoints || !!sim.emitters?.some(emitter => emitter.config.image);
   }
   prepareSimulation(sim: PortalSimulation) {

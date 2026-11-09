@@ -92,7 +92,7 @@ export async function createFrameEncoder(format: string, options: AnimationOptio
     };
   }
   if (format === "apng") {
-    return async (rgba: Uint8ClampedArray, index: number, canvas?: EncodeCanvas) => new Uint8Array(await (await canvasPNG(canvas!)).arrayBuffer());
+    return async (_rgba: Uint8ClampedArray, _index: number, canvas?: EncodeCanvas) => new Uint8Array(await (await canvasPNG(canvas!)).arrayBuffer());
   }
   const { module, defaultOptions } = await codecModule(format);
   const encoderOptions = format === "webp"

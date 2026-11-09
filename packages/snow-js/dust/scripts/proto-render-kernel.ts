@@ -93,7 +93,7 @@ const kernelBytes = Uint8Array.from(atob(RENDER_KERNEL_WASM), (c) => c.charCodeA
 const kernelModule = new WebAssembly.Module(kernelBytes);
 const memory = new WebAssembly.Memory({ initial: 32 });
 const instance = new WebAssembly.Instance(kernelModule, { env: { mem: memory } });
-const blend = instance.exports.blend as (
+const blend = instance.exports["blend"] as (
   scene: number,
   xs: number,
   ys: number,

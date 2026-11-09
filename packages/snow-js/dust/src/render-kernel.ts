@@ -85,7 +85,7 @@ export class RenderKernel {
     this.memory = new WebAssembly.Memory({ initial: 4 });
     this.module = module;
     const instance = new WebAssembly.Instance(module, { env: { mem: this.memory } });
-    this.blend = instance.exports.blend as BlendExport;
+    this.blend = instance.exports["blend"] as BlendExport;
     this.capacity = this.memory.buffer.byteLength;
     this.noise = null;
     this.noiseMemory = null;

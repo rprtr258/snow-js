@@ -19,6 +19,7 @@
     "serve:dust": "cd dust && bun run scripts/serve.ts"
   },
   "dependencies": {
+    "bootstrap": "^5.3.8",
     "gifenc": "^1.0.3"
   },
   "devDependencies": {

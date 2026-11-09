@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "workspaces": ["packages/*"],
   "scripts": {
+    "check": "bun check .",
     "dev:website": "cd ./packages/website && bun dev",
     "lint": "cd ./packages/snow-js && bun lint && cd ../website && bun lint",
     "lint:fix": "cd ./packages/snow-js && bun lint:fix && cd ../website && bun lint:fix"

@@ -2,7 +2,6 @@ import { ImageEmitterSimulation } from "./image-emitter-simulation";
 import {
   PortalSimulation,
   EFFECTS,
-  DT,
   EmissionRandom,
   PORTAL_EMITTERS,
   MAX_PARTICLES,

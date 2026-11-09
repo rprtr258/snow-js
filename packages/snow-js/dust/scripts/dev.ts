@@ -4,7 +4,7 @@ import { join, normalize } from "node:path";
 
 const root = normalize(new URL("../", import.meta.url).pathname);
 const dist = join(root, "dist");
-const port = Number(process.env.PORT ?? 3123);
+const port = Number(process.env["PORT"] ?? 3123);
 
 const encoder = new TextEncoder();
 const reloadClients = new Set<ReadableStreamDefaultController<Uint8Array>>();

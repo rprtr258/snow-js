@@ -81,7 +81,7 @@ function exportLoopSteps(): number {
   const loops: LoopCatalog = JSON.parse(
     readFileSync(new URL("../dist/assets/export-loops.json", import.meta.url), "utf8"),
   );
-  const match = loops.recipes.meditation.matches["1"]?.[0];
+  const match = loops.recipes["meditation"].matches["1"]?.[0];
   if (!match) throw new Error("export-loops.json: no meditation match for speed 1");
   return match[1] + match[0];
 }

@@ -19,11 +19,8 @@ function parseHexColor(hex: string): RGB {
     hex = hex.slice(1);
 
   if (hex.length === 3) {
-    // @ts-expect-error sosal
     const r = parseInt(hex[0] + hex[0], 16);
-    // @ts-expect-error sosal
     const g = parseInt(hex[1] + hex[1], 16);
-    // @ts-expect-error sosal
     const b = parseInt(hex[2] + hex[2], 16);
     return [r/255, g/255, b/255];
   }
@@ -314,7 +311,6 @@ void dustEffectGroups().then((groups) => {
 
 pane.on("change", (e) => {
   void e;
-  // // @ts-expect-error sosi
   // if (e.target.label === "preset")
   //   rebuild();
   if (effectState.effect !== "snow")

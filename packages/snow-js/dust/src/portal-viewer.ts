@@ -337,10 +337,10 @@ function syncShareUrl() {
 function applyUrl() {
   const p = readParams(), key = (p.get("e") ?? "") as string;
   if (Object.prototype.hasOwnProperty.call(MATH_EFFECTS, key)) {
-    selected.math = key;
+    selected["math"] = key;
     select("collection").value = "math";
   } else if (Object.prototype.hasOwnProperty.call(EFFECTS, key) || Object.prototype.hasOwnProperty.call(catalog!.effects, key)) {
-    selected.game = key;
+    selected["game"] = key;
     select("collection").value = "game";
   }
   color = hexParam(p.get("c"));
