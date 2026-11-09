@@ -1,31 +1,56 @@
 # snow-js
 
-An effects library: every visual effect (shader screensavers, particle
-simulations) is a self-contained **effect definition** carrying its own typed
-options schema. Consumers list effects from a registry, instantiate them
-behind one tiny interface, and build configuration UIs from the option specs —
-no per-effect frontend code.
+A browser effects library where every visual effect — falling snow, a
+psychedelic tunnel, a Noita-style dust simulation — is a self-contained
+**effect definition** carrying its own typed options schema. List effects
+from a registry, drive them through one tiny instance interface, and build
+configuration UIs straight from the option specs: adding an effect is one
+file plus a registry entry, with no per-effect frontend code.
 
-## Usage
+- **Live demo.** [rprtr258.github.io/snow-js](https://rprtr258.github.io/snow-js/)
+  — the showcase site renders every effect's settings form automatically
+  from its option specs.
+- **Typed options.** Schemas are built from `num` / `bool` / `color` /
+  `select` / `action` helpers; `InferOptions` derives the options struct from
+  the schema, so `createEffect` calls are checked at compile time.
+- **One tiny interface.** Instances expose `start` / `stop` / `update` /
+  `unmount` (plus optional `restart`); WebGL plumbing, workers and wasm stay
+  inside each effect.
+- **Zero runtime dependencies.** Ships as TypeScript source.
+- **Three effects built in.** `snow` (flat snow + layered `snowfall`
+  blizzard preset), `creation` (psychedelic tunnel), `dust` (Noita-style
+  portals, objects and math figures).
 
 ```ts
-import {createEffect, EFFECTS} from "snow-js";
+import {createEffect} from "snow-js";
 
-// List effects (key, label, option specs) and drive instances:
-for (const def of EFFECTS)
-  console.log(def.label);
-
-const instance = createEffect(container, "snow", {speed: 5});
+const instance = createEffect(container, "snow", {speed: 5}); // checked against snow's schema
 instance.start();
-instance.update({amount: 0.2}); // live option updates
+instance.update({amount: 0.3}); // live option updates, no remount
 instance.unmount();
 ```
 
-Effects available: `snow`, `creation`, `dust` — each fills its own
-options struct (checked against the effect's schema at compile time via the
-typed `createEffect` overload). `snow` ships two presets selectable via its
-`preset` option: `snow` (flat snow, the default) and `snowfall`
-(layered blizzard); the visible settings follow the chosen preset.
+## Getting started
+
+Add the library to a project:
+
+```bash
+bun add snow-js   # or: npm i snow-js
+```
+
+or straight from git:
+
+```bash
+bun add github:rprtr258/snow-js
+```
+
+To hack on the library itself, run the demo website from the repo:
+
+```bash
+git clone https://github.com/rprtr258/snow-js
+cd snow-js && bun install
+bun run dev:website   # website with the tweakpane playground
+```
 
 ## Adding a new effect
 
@@ -55,7 +80,7 @@ typed `createEffect` overload). `snow` ships two presets selectable via its
    });
    ```
 
-2. Register it in `packages/snow-js/registry.ts` (`EFFECTS` array).
+2. Register it in `packages/snow-js/registry.ts` (`EFFECTS` object).
 
 That is all: the website picks the effect up in its dropdown and renders its
 form automatically. An effect instance implements `start` / `stop` / `update`
@@ -69,7 +94,7 @@ itself is synchronous.
 ```
 packages/snow-js/
   effect.ts            abstraction: specs, schema helpers, defineEffect
-  registry.ts          EFFECTS list, createEffect/getEffect
+  registry.ts          EFFECTS object, createEffect/getEffect
   glsl.ts              WebGL quad renderer (shader effects)
   effects/
     snow-runner.ts     shared lifecycle for fragment-shader effects
@@ -89,9 +114,9 @@ packages/snow-js/
 ```bash
 bun install
 bun run dev:website   # website with the tweakpane playground
-bun lint              # eslint + knip
-bun typecheck
-bun test              # dust kernels, render snapshots, schema tests
+bun run lint          # eslint + knip (both packages)
+bun run typecheck     # both packages
+cd packages/snow-js && bun test   # dust kernels, render snapshots, schema tests
 ```
 
 Dust's browser side is its embed viewer (effects/dust/src/embed.ts); the
