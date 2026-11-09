@@ -5,11 +5,8 @@
   // dust/scripts/*.ts tools are entry points too. The embed entry points come
   // from snow-js's package.json exports.
   "entry": [
-    "dust/src/portal-viewer.ts",
     "dust/src/meditation.ts",
     "dust/src/render-worker.ts",
-    "dust/src/gif-worker.ts",
-    "dust/src/export-frame-worker.ts",
     "dust/src/*.test.ts",
     "dust/scripts/*.ts"
   ],

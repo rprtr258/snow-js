@@ -19,10 +19,6 @@
     "dev:dust": "cd dust && bun run scripts/dev.ts",
     "serve:dust": "cd dust && bun run scripts/serve.ts"
   },
-  "dependencies": {
-    "bootstrap": "^5.3.8",
-    "gifenc": "^1.0.3"
-  },
   "devDependencies": {
     "@types/bun": "latest",
     "knip": "^6.44.2"

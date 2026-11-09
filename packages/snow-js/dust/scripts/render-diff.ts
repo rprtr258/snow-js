@@ -38,7 +38,13 @@ import {
   PREVIEW_RENDER_WIDTH,
 } from "../src/render-resolution";
 import { ViewerRuntime } from "../src/viewer-runtime";
-import type { LoopCatalog } from "../src/export-loop-plans";
+
+type LoopCatalog = {
+  version: number;
+  speeds: number[];
+  seconds: number[];
+  recipes: Record<string, {origin: number; matches: Record<string, [number, number, number][]>}>;
+};
 
 const DRIFT_FRAMES = 600; // rendered frames compared for drift
 const EMISSION_FRAMES = 1000; // emission-count identity window

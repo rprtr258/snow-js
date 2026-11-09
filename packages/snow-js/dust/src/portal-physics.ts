@@ -2,7 +2,6 @@
 // No terrain, external forces, camera culling, or other entities' shared RNG calls.
 import { loopAngle } from "./loop-motion";
 import {
-  Catalog,
   EmissionConfig,
   EmitterState,
   EmissionPoint,
@@ -10,7 +9,6 @@ import {
   PARTICLE_PURPLE,
   Particle,
   ParticleQuad,
-  Resources,
   Segments,
   SimulationOptions,
   SpriteEmitterState,
@@ -259,7 +257,7 @@ function meditationPoints(frame: number, worldSeed = 0, x = 0, y = 0, period = 0
 }
 
 // teleport_hourglass_return.lua: rotation is intentionally applied TWICE.
-export function hourglassEmitters(frame: number, x = 0, y = 0, period = 0) {
+function hourglassEmitters(frame: number, x = 0, y = 0, period = 0) {
   const rotation =
     loopAngle(frame, 0.003, period) +
     Math.sin(loopAngle(frame, 0.02, period)) * 0.6 +
@@ -590,11 +588,6 @@ export function writeParticleVertices(p: Particle, glow: boolean, out: Float32Ar
   return q.alpha;
 }
 
-export type SimulationFactory = (
-  options: SimulationOptions,
-  catalog: Catalog,
-  resources: Resources,
-) => PortalSimulation;
 // Optional capabilities only the math and image simulations implement.
 export type TrailScalableSimulation = PortalSimulation & {
   setTrailScale?: (value?: number) => void;

@@ -1,16 +1,7 @@
 export type V2 = {x: number, y: number};
 export type Point2 = [number, number];
 export type Edge = [number, number];
-// Pixel geometry shared by the GIF/export pipeline.
 export type Rect = {x: number; y: number; width: number; height: number};
-export type Size = {width: number; height: number};
-export type Bounds = {left: number; right: number; top: number; bottom: number};
-export type RasterSize = {
-  width: number;
-  height: number;
-  baseWidth: number;
-  baseHeight: number;
-};
 export type Segment = Point2[];
 export type Segments = Segment[];
 
@@ -58,7 +49,7 @@ export type SpriteSpec = {
   entityX: number;
   entityY: number;
 };
-export type MaterialInfo = {color: number; glow: number; cellType: string};
+type MaterialInfo = {color: number; glow: number; cellType: string};
 export type EmitterConfig = {
   entityX: number;
   entityY: number;
@@ -264,8 +255,7 @@ export type NormalizedOptions = {
   smoothGlow: boolean;
   portalSprite: boolean;
 };
-export type RuntimeOptionsState = {core?: unknown; glow?: unknown};
-export type FrameRequest = {
+type FrameRequest = {
   elapsed?: number;
   speed?: number;
   paused?: boolean;

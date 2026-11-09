@@ -3,7 +3,7 @@
 // effect size: the render buffer is the display resolution (derived, never a
 // fixed 480×320 literal) and the world→pixel transform is scaled to match, so
 // figures keep their on-screen size while gaining detail.
-export const PREVIEW_WIDTH = 480;
+const PREVIEW_WIDTH = 480;
 export const PREVIEW_HEIGHT = 320;
 export const RESOLUTION_SCALE = 1;
 export const PREVIEW_RENDER_WIDTH = PREVIEW_WIDTH * RESOLUTION_SCALE;
