@@ -738,8 +738,8 @@ export class PortalSimulation {
       cullInvisible,
       particleMirror,
     });
-    // Authored presentation floor (meditation page); only ever lengthens the
-    // native trail, never shortens it.
+    // Authored presentation floor; only ever lengthens the native trail,
+    // never shortens it.
     this.trailEmission =
       minTrailLifetime > trail.lifeMin
         ? Object.freeze({ ...trail, lifeMin: minTrailLifetime })

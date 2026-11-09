@@ -10,10 +10,7 @@
     "lint": "eslint '**/*.{ts,json}' && knip",
     "typecheck": "bun check",
     "lint:fix": "eslint '**/*.{ts,json}' --fix",
-    "test": "bun test",
-    "build:dust": "cd effects/dust && bun run scripts/build.ts",
-    "dev:dust": "cd effects/dust && bun run scripts/dev.ts",
-    "serve:dust": "cd effects/dust && bun run scripts/serve.ts"
+    "test": "bun test"
   },
   "devDependencies": {
     "@types/bun": "latest",

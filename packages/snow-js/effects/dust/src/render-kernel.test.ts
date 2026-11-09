@@ -98,9 +98,8 @@ function bitsOf(values: ArrayLike<number>): string {
   return key;
 }
 
-// The meditation page's replay (src/meditation.ts) at density 1: same
-// emitters, lifetimes and fast branches as the page, with a pool small enough
-// for a few hundred lockstep steps.
+// The fullscreen replay at density 1: same emitters, lifetimes and fast
+// branches, with a pool small enough for a few hundred lockstep steps.
 function meditationReplay() {
   return {
     worldSeed: 1,

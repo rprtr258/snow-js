@@ -1,5 +1,5 @@
 // Unit coverage for the embed's two view geometry modes and the derived
-// emission density (docs/specs/2026-11-09-dust-meditation-parity.spec.md).
+// emission density.
 import {describe, expect, test} from "bun:test";
 import {computeDensity, computeView} from "./embed.ts";
 
@@ -13,7 +13,7 @@ describe("computeView", () => {
     expect(computeView(1920, 1080, 2, false, 2)).toEqual({width: 569, height: 320, scale: 2});
   });
 
-  test("fullscreen sizes the buffer to host device pixels (meditation geometry)", () => {
+  test("fullscreen sizes the buffer to host device pixels", () => {
     // fullscreenView: min(3840, 2160)/2/146 = 2160/292
     expect(computeView(1920, 1080, 2, true, 1)).toEqual({
       width: 3840,
@@ -41,7 +41,7 @@ describe("computeDensity", () => {
     expect(computeDensity(false, 2.5, 7.4)).toBe(2.5);
   });
 
-  test("fullscreen derives the meditation scale×2 boost", () => {
+  test("fullscreen derives the scale×2 boost", () => {
     expect(computeDensity(true, 1, 7.4)).toBe(14.8);
     expect(computeDensity(true, 0.5, 7.4)).toBe(7.4);
   });

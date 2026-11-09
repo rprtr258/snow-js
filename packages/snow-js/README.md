@@ -92,8 +92,7 @@ bun run dev:website   # website with the tweakpane playground
 bun lint              # eslint + knip
 bun typecheck
 bun test              # dust kernels, render snapshots, schema tests
-bun run build:dust    # dust's standalone meditation page
 ```
 
-The dust viewer page (packages/snow-js/effects/dust) builds its own browser
-entry; the simulation and raster code are untouched by the registry layer.
+Dust's browser side is its embed viewer (effects/dust/src/embed.ts); the
+simulation and raster code are untouched by the registry layer.

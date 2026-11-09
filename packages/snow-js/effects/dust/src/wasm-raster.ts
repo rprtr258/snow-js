@@ -14,19 +14,6 @@ type RasterExports = {
 
 // Optional accelerator. JS and WASM run the same full-resolution raster formulas.
 // WebAssembly disabled/CSP-blocked? The viewer retains the pure-JS fallback.
-export async function loadRasterModule(): Promise<WebAssembly.Module | null> {
-  try {
-    if (typeof WebAssembly === "undefined") return null;
-    const response = await fetch(
-      new URL("./assets/raster.wasm", import.meta.url),
-    );
-    return response.ok
-      ? await WebAssembly.compile(await response.arrayBuffer())
-      : null;
-  } catch {
-    return null;
-  }
-}
 export class WasmRaster {
   declare api: RasterExports;
   declare width: number;

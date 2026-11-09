@@ -22,7 +22,7 @@ function normalizeOptions(options: RawOptions): NormalizedOptions {
     background: validateColor(options.background),
     monochrome: !!options.monochrome,
     smoothGlow: !!options.smoothGlow,
-    // Absent means drawn: every existing page relies on the portal sprite.
+    // Absent means drawn: every consumer relies on the portal sprite.
     portalSprite: options.portalSprite !== false,
   };
 }
@@ -111,7 +111,7 @@ export class ViewerRuntime {
     );
     this.setupSimulation(candidate);
     // Batch the fast path's airflow noise through the wasm kernel when one is
-    // loaded (the meditation page): one wasm simplex3 call per step instead
+    // loaded: one wasm simplex3 call per step instead
     // of one JS call per particle. Bit-identical to the inline JS noise
     // (src/render-kernel.test.ts); without a kernel the sim keeps its inline
     // noise. Closed over the current kernel instance: a setView() rebuild

@@ -85,7 +85,7 @@ function fixtureUrl(path: string): URL {
 // `period` frames, so the spot-check frame is offset + period.
 function exportLoopSteps(): number {
   const loops: LoopCatalog = JSON.parse(
-    readFileSync(new URL("../dist/assets/export-loops.json", import.meta.url), "utf8"),
+    readFileSync(new URL("../static/assets/export-loops.json", import.meta.url), "utf8"),
   );
   const match = loops.recipes["meditation"].matches["1"]?.[0];
   if (!match) throw new Error("export-loops.json: no meditation match for speed 1");
@@ -122,7 +122,8 @@ function consumerFrameHashes(
 
 // The exact-path run everything is compared against: DRIFT_FRAMES meditation
 // frames, the export-loop GIF-consumer frame, and MATH_FRAMES math_penrose
-// frames (glow on, exercising the compose/sprite paths the page skips).
+// frames (glow on, exercising the compose/sprite paths MEDITATION_RENDER
+// skips).
 function recordExactRun(harness: Harness): {
   frameHashes: string[];
   exportLoopHash: string;

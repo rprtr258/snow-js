@@ -9,9 +9,9 @@ export const RESOLUTION_SCALE = 1;
 export const PREVIEW_RENDER_WIDTH = PREVIEW_WIDTH * RESOLUTION_SCALE;
 export const PREVIEW_RENDER_HEIGHT = PREVIEW_HEIGHT * RESOLUTION_SCALE;
 
-// Fullscreen meditation page (`meditation.html`). The render buffer IS the
-// screen (device pixels) and the world→pixel scale sizes the portal's
-// MEDITATION_PORTAL_SPAN-cell extent to half of the lower device dimension,
+// Fullscreen mode. The render buffer IS the screen (device pixels) and the
+// world→pixel scale sizes the portal's MEDITATION_PORTAL_SPAN-cell extent to
+// half of the lower device dimension,
 // so positions and textures scale with the viewport while dynamic primitives
 // stay pixel-fine: sparks are 1×1 device px (2×1 for wide gas/fire), trail
 // strokes 1px thick, never scaled blocks. The sprite and glow kernels are

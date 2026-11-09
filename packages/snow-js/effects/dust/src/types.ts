@@ -243,7 +243,7 @@ export type RawOptions = {
   monochrome?: unknown;
   smoothGlow?: unknown;
   // Presentation-only opt-out for the catalog portal ring sprite
-  // (teleport_center.png); the meditation page draws particles only.
+  // (teleport_center.png); when off, particles render alone.
   portalSprite?: unknown;
 };
 export type NormalizedOptions = {
@@ -313,14 +313,13 @@ export type SimulationOptions = {
   // Scaled views pass the world→pixel scale so particle counts and trail
   // sampling stay as dense on screen as they are at one cell = one pixel.
   density?: number;
-  // Presentation-only opt-out for the ambient ring halo around the body
-  // (the meditation page renders the cube and motes alone). Default true:
-  // emitted, as in the game.
+  // Presentation-only opt-out for the ambient ring halo around the body.
+  // Default true: emitted, as in the game.
   ambientRing?: boolean;
   // Opt-in float64 particle integration without Math.fround, with a
   // specialized branch for the common portal profile. Defaults off: every
-  // consumer except the meditation page keeps the byte-exact fround
-  // reference. Numeric drift only, bounded by scripts/render-diff.ts gates;
+  // consumer keeps the byte-exact fround reference. Numeric drift only,
+  // bounded by scripts/render-diff.ts gates;
   // the RNG stream, emission counts and lifetimes are identical.
   fastParticles?: boolean;
   // Presentation-only cull for the same air model: drop particles that can
@@ -328,8 +327,8 @@ export type SimulationOptions = {
   // instead of retaining them to lifetime expiry on the cheap advance path.
   // Output-invariant — such particles render nothing, interact with nothing
   // and consume no RNG — but pool size and age/lifetime bookkeeping then
-  // differ from the native retention. Opt-in (meditation page); has no
-  // effect unless retainInvisible is false. Defaults off.
+  // differ from the native retention. Opt-in; has no effect unless
+  // retainInvisible is false. Defaults off.
   cullInvisible?: boolean;
   // Opt-in SoA staging mirror for the wasm blend kernel (src/render-kernel.ts):
   // advanceParticles additionally packs the pool's x/y/alpha/color/flags into

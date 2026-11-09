@@ -269,7 +269,7 @@ export class SoftwareRenderer {
     // The wasm blend kernel and the wasm rasterizer own separate linear
     // memories; the kernel path needs the scene buffer to live in its own
     // memory, so the two hosts are mutually exclusive. Consumers pass both
-    // modules only when they never rasterize glow (the meditation page).
+    // modules only when they never rasterize glow.
     if (kernelModule && !this.renderKernel) {
       try {
         this.native = new WasmRaster(

@@ -1,8 +1,7 @@
-// Embeddable fullscreen viewer for the snow-js website. Runs the same
-// worker pipeline as the portal page (portal-viewer.ts) but sizes the render
-// buffer to the host element's aspect ratio and exposes a Snow-like class
-// API. The ported simulation and raster code are untouched; this module only
-// orchestrates.
+// Embeddable fullscreen viewer for the snow-js website. Runs the worker
+// pipeline, sizes the render buffer to the host element's aspect ratio and
+// exposes a Snow-like class API. The ported simulation and raster code are
+// untouched; this module only orchestrates.
 import { ViewerRuntime } from "./viewer-runtime";
 import { EFFECTS } from "./portal-physics";
 import { MATH_EFFECTS } from "./math-figures";
@@ -11,8 +10,7 @@ import { compileRenderKernel } from "./render-kernel";
 import { fullscreenView, PREVIEW_HEIGHT, RESOLUTION_SCALE } from "./render-resolution";
 import { Catalog, RawOptions, SimulationOptions } from "./types";
 
-// wasm-raster.ts resolves raster.wasm relative to src/, which only exists in
-// dust's merged dist layout. The embed loads the real static/ path instead.
+// raster.wasm lives under static/assets/; the embed loads it directly.
 async function loadEmbedRasterModule(): Promise<WebAssembly.Module | null> {
   try {
     const response = await fetch(
@@ -32,12 +30,12 @@ export type DustOptions = {
   effect: string;
   speed: number;
   zoom: number;
-  // Fullscreen geometry (the meditation page's): the render buffer is the
-  // host's device pixels and the portal spans half the smaller dimension.
+  // Fullscreen geometry: the render buffer is the host's device pixels and
+  // the portal spans half the smaller dimension.
   // Default off keeps the fixed 320px preview buffer.
   fullscreen: boolean;
-  // Emission density multiplier; fullscreen mode adds the meditation page's
-  // derived scale×2 boost on top (computeDensity).
+  // Emission density multiplier; fullscreen mode adds a derived scale×2
+  // boost on top (computeDensity).
   density: number;
   core: boolean;
   glow: boolean;
@@ -150,9 +148,9 @@ function bufferSize(width: number, height: number) {
 }
 
 // Render view for the two geometry modes. Preview (default): the fixed
-// 320px-tall buffer at one world cell = one pixel. Fullscreen (the
-// meditation page's geometry): the buffer is the host's device pixels and
-// the portal spans half the smaller device dimension; zoom still applies
+// 320px-tall buffer at one world cell = one pixel. Fullscreen: the buffer is
+// the host's device pixels and the portal spans half the smaller device
+// dimension; zoom still applies
 // on top.
 export function computeView(
   width: number,
@@ -168,7 +166,7 @@ export function computeView(
 }
 
 // Emission density: the density option scales the native rate; fullscreen
-// mode derives the meditation page's scale×2 boost so on-screen particle
+// mode derives a scale×2 boost so on-screen particle
 // density matches one cell = one pixel at any viewport size.
 export function computeDensity(fullscreen: boolean, density: number, scale: number) {
   return density * (fullscreen ? scale * 2 : 1);
@@ -315,7 +313,7 @@ export class Dust {
   }
 
   // Module workers unavailable or disallowed: run the same software renderer
-  // on the main thread (portal-viewer's fallback pattern).
+  // on the main thread.
   private async fallback(error: unknown) {
     if (this.disposed) return;
     this.worker?.terminate();
@@ -438,8 +436,8 @@ export class Dust {
     if (this.disposed) return;
     if (this.options.fullscreen) {
       // The derived emission density tracks the view scale, so a fullscreen
-      // resize rebuilds the view and the replay like the meditation page
-      // (debounced; dragging a window edge would otherwise restart per frame).
+      // resize rebuilds the view and the replay (debounced; dragging a
+      // window edge would otherwise restart per frame).
       if (this.resizeTimer !== null) clearTimeout(this.resizeTimer);
       this.resizeTimer = setTimeout(() => {
         this.resizeTimer = null;

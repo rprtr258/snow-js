@@ -1,6 +1,6 @@
-// Shared setup for the meditation perf/drift harness (bench-meditation.ts and
-// render-diff.ts): loads the built assets from dist/ and reproduces the
-// fullscreen meditation page's exact simulation and render configuration.
+// Shared setup for the drift/render harness (render-diff.ts): loads the
+// checked-in assets from static/assets/ and reproduces the fullscreen
+// replay's exact simulation and render configuration.
 import { readFileSync } from "node:fs";
 import { decodeAssets, makeSimulation } from "../src/effect-simulation";
 import { SoftwareRenderer } from "../src/software-renderer";
@@ -21,13 +21,13 @@ export type Harness = {
 
 export function loadHarness(): Harness {
   const catalog: Catalog = JSON.parse(
-    readFileSync(`${ROOT}dist/assets/effects.json`, "utf8"),
+    readFileSync(`${ROOT}static/assets/effects.json`, "utf8"),
   );
-  const bin = readFileSync(`${ROOT}dist/assets/effects.bin`);
+  const bin = readFileSync(`${ROOT}static/assets/effects.bin`);
   const buffer = bin.buffer.slice(bin.byteOffset, bin.byteOffset + bin.byteLength);
   const resources = decodeAssets(catalog, buffer);
   const kernelModule = new WebAssembly.Module(
-    readFileSync(`${ROOT}dist/assets/raster.wasm`),
+    readFileSync(`${ROOT}static/assets/raster.wasm`),
   );
   const renderKernelModule = new WebAssembly.Module(
     Buffer.from(RENDER_KERNEL_WASM, "base64"),
@@ -35,7 +35,7 @@ export function loadHarness(): Harness {
   return { catalog, resources, buffer, kernelModule, renderKernelModule };
 }
 
-// The meditation page's render options (src/meditation.ts), after the worker's
+// The fullscreen replay's render options after the worker's
 // normalizeOptions/renderOptions round-trip: color null, background 0.
 export const MEDITATION_RENDER = {
   core: true,
@@ -47,15 +47,14 @@ export const MEDITATION_RENDER = {
   portalSprite: false,
 } as const;
 
-// The meditation page's replay (src/meditation.ts). The worker's
+// The fullscreen replay configuration. The worker's
 // ViewerRuntime.restart additionally forces retainInvisible: false on every
 // replay. density tracks the world→pixel scale (replay.density = scale*2).
-// cullInvisible is always on to match the page; it is output-invariant (the
+// cullInvisible is always on; it is output-invariant (the
 // dropped particles render nothing, interact with nothing, consume no RNG),
 // so the exact-regression baseline recorded without the flag must still
 // hash-match — that gate doubles as the invariance proof. fastParticles is
-// always explicit here so harness modes never depend on the page's current
-// default.
+// always explicit here so harness modes never depend on an option default.
 export function meditationReplay(
   width: number,
   height: number,
