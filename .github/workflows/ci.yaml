@@ -18,6 +18,9 @@ jobs:
       - name: Install deps
         run: bun install
 
+      - name: Check wasm build
+        run: bun check:wasm
+
       - name: Lint
         run: bun lint
 

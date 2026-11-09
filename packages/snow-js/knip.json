@@ -11,6 +11,5 @@
     "effects/dust/scripts/*.ts",
     "*.test.ts"
   ],
-  "project": ["*.ts", "effects/**/*.ts"],
-  "ignoreBinaries": ["wat2wasm"]
+  "project": ["*.ts", "effects/**/*.ts"]
 }
