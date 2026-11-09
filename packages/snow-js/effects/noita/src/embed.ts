@@ -34,8 +34,8 @@ export type NoitaOptions = {
   // the portal spans half the smaller dimension.
   // Default off keeps the fixed 320px preview buffer.
   fullscreen: boolean;
-  // Emission density multiplier; fullscreen mode adds a derived scale×2
-  // boost on top (computeDensity).
+  // Emission density multiplier; view-independent (pass-through in both
+  // modes).
   density: number;
   core: boolean;
   glow: boolean;
@@ -161,12 +161,12 @@ export function computeView(
   return {width: view.width, height: view.height, scale: view.scale * clampZoom(zoom)};
 }
 
-// Emission density: the density option scales the native rate; fullscreen
-// mode derives a scale×2 boost so on-screen particle
-// density matches one cell = one pixel at any viewport size.
-export function computeDensity(fullscreen: boolean, density: number, scale: number) {
-  return density * (fullscreen ? scale * 2 : 1);
-}
+// Emission density is view-independent: fullscreen renders the same world
+// content at a higher resolution (one cell = scale device pixels), so the
+// density option passes through unchanged. A scale-derived boost was tried
+// and removed — it multiplied the per-world-cell particle (and glow) density
+// ~6× at 1080p, flooding the scene with a much brighter halo than the
+// preview.
 
 export class Noita {
   options: NoitaOptions;
@@ -243,11 +243,7 @@ export class Noita {
       x: clampWorld(this.options.x),
       y: clampWorld(this.options.y),
       startFrame: 0,
-      density: computeDensity(
-        this.options.fullscreen,
-        this.options.density,
-        this.geometry().scale,
-      ),
+      density: this.options.density,
       minTrailLifetime: this.options.minTrailLifetime,
       ambientRing: this.options.ambientRing,
       fastParticles: this.options.fastParticles,
@@ -363,15 +359,15 @@ export class Noita {
   private resize() {
     if (this.disposed) return;
     if (this.options.fullscreen) {
-      // The derived emission density tracks the view scale, so a fullscreen
-      // resize rebuilds the view and the replay (debounced; dragging a
-      // window edge would otherwise restart per frame).
+      // The render buffer is the host's device pixels, so a fullscreen
+      // resize rebuilds the view (debounced; dragging a window edge would
+      // otherwise reallocate the renderer per frame). The simulation is
+      // view-independent and keeps running through resizes.
       if (this.resizeTimer !== null) clearTimeout(this.resizeTimer);
       this.resizeTimer = setTimeout(() => {
         this.resizeTimer = null;
         if (this.disposed || !this.ready) return;
         this.applyView();
-        this.restart();
       }, 200);
       return;
     }
@@ -443,16 +439,14 @@ export class Noita {
       return;
     }
     if (previous.fullscreen !== this.options.fullscreen) {
-      // The view geometry and the derived density both change with the mode.
+      // Only the view geometry changes with the mode; the simulation is
+      // view-independent and keeps running.
       this.applyView();
-      this.restart();
       return;
     }
     if (previous.zoom !== this.options.zoom) {
-      // In fullscreen mode zoom rescales the derived density, so the replay
-      // must be re-sent; the preview buffer keeps its restart-free zoom.
+      // Zoom is view-only in both modes.
       this.applyView();
-      if (this.options.fullscreen) this.restart();
       return;
     }
     if (

@@ -5,7 +5,7 @@
   "workspaces": ["packages/*"],
   "scripts": {
     "check": "bun check .",
-    "check:wasm": "cd ./packages/snow-js/effects/dust && bun scripts/build-render-kernel.ts --check",
+    "check:wasm": "cd ./packages/snow-js/effects/noita && bun scripts/build-render-kernel.ts --check",
     "dev:website": "bun run --filter='./packages/website' dev",
     "lint": "bun run --filter='./packages/*' lint",
     "typecheck": "bun run --filter='./packages/*' typecheck",

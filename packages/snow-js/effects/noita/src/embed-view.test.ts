@@ -1,7 +1,6 @@
-// Unit coverage for the embed's two view geometry modes and the derived
-// emission density.
+// Unit coverage for the embed's two view geometry modes.
 import {describe, expect, test} from "bun:test";
-import {computeDensity, computeView} from "./embed.ts";
+import {computeView} from "./embed.ts";
 
 describe("computeView", () => {
   test("preview keeps the fixed 320px buffer and one-cell-one-pixel scale", () => {
@@ -35,14 +34,3 @@ describe("computeView", () => {
   });
 });
 
-describe("computeDensity", () => {
-  test("preview passes the density option through", () => {
-    expect(computeDensity(false, 1, 7.4)).toBe(1);
-    expect(computeDensity(false, 2.5, 7.4)).toBe(2.5);
-  });
-
-  test("fullscreen derives the scale×2 boost", () => {
-    expect(computeDensity(true, 1, 7.4)).toBe(14.8);
-    expect(computeDensity(true, 0.5, 7.4)).toBe(7.4);
-  });
-});

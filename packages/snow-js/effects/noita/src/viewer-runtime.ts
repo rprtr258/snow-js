@@ -183,26 +183,21 @@ export class ViewerRuntime {
     let pixels: Uint8ClampedArray | null = null,
       simulationMS = 0,
       rasterMS = 0;
-    // With glow off a render is a pure function of the simulation state (the
-    // temporal-glow history it would advance is never read) and only the last
-    // render's pixels are ever returned — intermediate renders are discarded
-    // work. Render once after the stepping loop instead of once per step: a
-    // slow rAF (steps = 2) then pays one render, not two.
-    const glow = this.options.glow;
+    // Renders once per frame() call after the stepping loop, for glow too:
+    // intermediate renders were always discarded, and a per-step render
+    // doubled the glow pipeline's cost exactly when the machine was already
+    // behind — the death spiral the pending-debt cap exists to prevent. Glow
+    // history therefore advances per displayed frame (wall-clock decay)
+    // instead of per simulation step.
     for (let i = 0; i < steps; i++) {
-      let t = performance.now();
+      const t = performance.now();
       if (this.imageReplay?.ready) this.restart(this.replayInput, this.revision, true);
       this.simulation.step();
       this.imageReplay?.afterStep();
       simulationMS += performance.now() - t;
-      if (glow) {
-        t = performance.now();
-        pixels = this.renderer.render(this.simulation, renderOptions(this.options), true, i === 0 ? recycle : null);
-        rasterMS += performance.now() - t;
-      }
       if (!step) this.pending -= FRAME_MS;
     }
-    if (steps && !glow) {
+    if (steps) {
       const t = performance.now();
       pixels = this.renderer.render(this.simulation, renderOptions(this.options), true, recycle);
       rasterMS = performance.now() - t;
@@ -210,7 +205,12 @@ export class ViewerRuntime {
     if (!steps && redraw) {
       pixels = this.renderer.render(this.simulation, renderOptions(this.options), false, recycle);
     }
-    if (steps) this.cost = { simulation: simulationMS / steps, raster: glow ? rasterMS / steps : rasterMS };
+    if (steps)
+      this.cost = {
+        simulation: simulationMS / steps,
+        // One render per frame() call: this is the per-frame raster cost.
+        raster: rasterMS,
+      };
     return { revision: this.revision, stats: this.stats(), pixels, steps };
   }
 }

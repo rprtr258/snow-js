@@ -1,5 +1,9 @@
-// Full-resolution, deterministic rasterizer. No WebGL, canvas calls, random draws,
-// particle thinning, frame interpolation, or reduced-resolution glow here.
+// Deterministic rasterizer. No WebGL, canvas calls, random draws, particle
+// thinning, or frame interpolation here. The glow field renders at full
+// resolution while its per-particle kernel stays small; past a kernel-size
+// threshold the field downsamples and is bilinearly upsampled into the
+// composer's history (see the constructor) — still deterministic, just not
+// per-device-pixel.
 import { writeParticleVertices, particleQuad, PortalSimulation } from "./portal-physics";
 import { RenderKernel } from "./render-kernel";
 import { GlowTap, RasterTexture, WasmRaster } from "./wasm-raster";
@@ -180,6 +184,16 @@ export class SoftwareRenderer {
   declare history: Float32Array;
   declare horizontal: Float32Array;
   declare vertical: Float32Array;
+  // Glow field geometry. glowSub === 1 keeps every glow buffer at full
+  // resolution (the legacy byte-exact path); below 1 the glow field renders
+  // into glowW×glowH buffers and is bilinearly upsampled into historyFull,
+  // the full-resolution history the composers read.
+  declare glowSub: number;
+  declare glowW: number;
+  declare glowH: number;
+  declare historyFull: Float32Array | null;
+  // Scratch for rasterQuad's downsampled glow corners.
+  declare glowCorners: Float32Array;
   declare output: Uint8ClampedArray;
   declare layers: Map<number, GlowLayer>;
   declare colorKernels: Map<number, GlowTap[]>;
@@ -233,10 +247,26 @@ export class SoftwareRenderer {
     this.scene = this.renderKernel
       ? this.renderKernel.sceneView(width * height * 4)
       : new Uint8ClampedArray(width * height * 4);
-    this.source = new Float32Array(width * height * 3);
-    this.history = new Float32Array(width * height * 3);
-    this.horizontal = new Float32Array(width * height * 3);
-    this.vertical = new Float32Array(width * height * 3);
+    // Glow field downsampling. The per-particle glow quad and the aggregation
+    // kernel both span 24 world cells = 24*scale device px, so glow raster
+    // work grows ∝ scale³ (fullscreen particle counts grow ∝ scale via the
+    // density boost while quad area grows ∝ scale²) — a 1080p frame then
+    // rasterizes the equivalent of >100 full screens of glow per frame. Past
+    // a 48px kernel the whole glow field (quads, aggregation, blur, temporal
+    // history) renders into downsampled buffers sized for a ≈24px kernel and
+    // is bilinearly upsampled into the full-resolution history for
+    // composition; the blur already low-passes the halo. At or below the
+    // threshold glowSub is 1, every buffer is full resolution, and every path
+    // is byte-identical to the unsampled renderer.
+    this.glowSub = 24 * scale > 48 ? Math.max(1 / 8, Math.min(1, 1 / scale)) : 1;
+    this.glowW = Math.max(1, Math.round(width * this.glowSub));
+    this.glowH = Math.max(1, Math.round(height * this.glowSub));
+    const glowBytes = this.glowW * this.glowH * 3;
+    this.source = new Float32Array(glowBytes);
+    this.history = new Float32Array(glowBytes);
+    this.horizontal = new Float32Array(glowBytes);
+    this.vertical = new Float32Array(glowBytes);
+    this.historyFull = null;
     this.output = new Uint8ClampedArray(width * height * 4);
     this.layers = new Map();
     this.colorKernels = new Map();
@@ -244,32 +274,36 @@ export class SoftwareRenderer {
     // Glow margin must be a whole pixel count: it sizes typed arrays, indexes
     // the aggregation map and reserves the wasm kernel buffer, all of which
     // silently misbehave on fractions. The exact fractional scale survives
-    // everywhere else.
-    this.pad = Math.ceil(24 * scale);
-    this.paddedWidth = width + this.pad * 2;
-    this.paddedHeight = height + this.pad * 2;
+    // everywhere else. Downsampled glow pads in glow-field pixels, so the
+    // margin and the padded aggregation map shrink with the field.
+    this.pad = Math.ceil(24 * scale * this.glowSub);
+    this.paddedWidth = this.glowW + this.pad * 2;
+    this.paddedHeight = this.glowH + this.pad * 2;
     this.corners = new Float32Array(8);
+    this.glowCorners = new Float32Array(8);
     this.phaseX = NaN;
     this.phaseY = NaN;
     this.kernel = null;
-    this.edgeWeights = new Float32Array(width * height);
-    for (let y = 0; y < height; y++)
-      for (let x = 0; x < width; x++) {
+    this.edgeWeights = new Float32Array(this.glowW * this.glowH);
+    for (let y = 0; y < this.glowH; y++)
+      for (let x = 0; x < this.glowW; x++) {
         // Source FBO coordinates are bottom-up in the GL path.
-        const u = (x + 0.5) / width,
-          v = 1 - (y + 0.5) / height;
+        const u = (x + 0.5) / this.glowW,
+          v = 1 - (y + 0.5) / this.glowH;
         let weight = 1;
         if (u > 0.95) weight = 1 - (u - 0.95) * 2;
         else if (u < 0.05) weight = 1 - (0.05 - u) * 2;
         if (v > 0.95) weight = 1 - (v - 0.95) * 2;
         else if (v < 0.05) weight = 1 - (0.05 - v) * 2;
-        this.edgeWeights[y * width + x] = weight;
+        this.edgeWeights[y * this.glowW + x] = weight;
       }
     this.native = null;
     // The wasm blend kernel and the wasm rasterizer own separate linear
     // memories; the kernel path needs the scene buffer to live in its own
     // memory, so the two hosts are mutually exclusive. Consumers pass both
-    // modules only when they never rasterize glow.
+    // modules when glow runs on the downsampled JS field (glowSub < 1) or
+    // never rasterizes glow; at glowSub === 1 with only the raster module the
+    // wasm path owns the whole glow pipeline.
     if (kernelModule && !this.renderKernel) {
       try {
         this.native = new WasmRaster(
@@ -279,17 +313,26 @@ export class SoftwareRenderer {
           this.glowTexture,
           resources.assets,
           this.pad,
+          this.glowSub === 1,
         );
         this.scene = this.native.scene;
-        this.source = this.native.source;
-        this.history = this.native.history;
-        this.horizontal = this.native.horizontal;
-        this.vertical = this.native.vertical;
-        this.native.edges.set(this.edgeWeights);
+        if (this.glowSub === 1) {
+          this.source = this.native.source;
+          this.history = this.native.history;
+          this.horizontal = this.native.horizontal;
+          this.vertical = this.native.vertical;
+          this.native.edges.set(this.edgeWeights);
+        } else {
+          // The downsampled field lives in JS; the upsample target is the
+          // wasm history so native.compose reads it without a copy.
+          this.historyFull = this.native.history;
+        }
       } catch {
         this.native = null;
       }
     }
+    if (this.glowSub < 1 && !this.historyFull)
+      this.historyFull = new Float32Array(width * height * 3);
     this.clear();
   }
   clear() {
@@ -298,6 +341,7 @@ export class SoftwareRenderer {
     this.history.fill(0);
     this.horizontal.fill(0);
     this.vertical.fill(0);
+    this.historyFull?.fill(0);
     for (let i = 3; i < this.scene.length; i += 4) this.scene[i] = 255;
     if (this.output?.byteLength) {
       this.output.fill(0);
@@ -361,13 +405,18 @@ export class SoftwareRenderer {
     this.colorKernels.clear(); this.activeKernel = null;
   }
   kernelFor(offsetX: number, offsetY: number) {
-    const phaseX = Math.ceil(offsetX - 0.5) + 0.5 - offsetX,
-      phaseY = Math.ceil(offsetY - 0.5) + 0.5 - offsetY;
+    const sub = this.glowSub,
+      px = offsetX * sub,
+      py = offsetY * sub,
+      phaseX = Math.ceil(px - 0.5) + 0.5 - px,
+      phaseY = Math.ceil(py - 0.5) + 0.5 - py;
     if (phaseX === this.phaseX && phaseY === this.phaseY) return;
     this.phaseX = phaseX;
     this.phaseY = phaseY;
     this.kernel = [];
-    const size = 24 * this.scale;
+    // Kernel extent in glow-field pixels: 24 world cells at the field's
+    // resolution (≈24px by construction when downsampled).
+    const size = 24 * this.scale * sub;
     for (let y = 0; y < size; y++)
       for (let x = 0; x < size; x++) {
         const u = (x + phaseX) / size,
@@ -403,7 +452,13 @@ export class SoftwareRenderer {
       }
       this.colorKernels.set(key, taps);
     }
-    if (this.native) {
+    // Downsampled glow always stamps on the JS field; the wasm buffers are
+    // full resolution and only host the glow pipeline at glowSub === 1.
+    // Byte-prequantized taps (not count-scaled floats) match the full-
+    // resolution quad path here: its per-write unorm8 rounding discards
+    // sub-byte per-particle increments, so tail taps below half a byte
+    // contribute nothing at full resolution either.
+    if (this.native && this.glowSub === 1) {
       if (this.activeKernel !== taps) {
         this.native.setKernel(taps);
         this.activeKernel = taps;
@@ -415,8 +470,8 @@ export class SoftwareRenderer {
       const k = taps[j],
         xx = x + k.x,
         yy = y + k.y;
-      if (xx < 0 || yy < 0 || xx >= this.width || yy >= this.height) continue;
-      const i = (yy * this.width + xx) * 3;
+      if (xx < 0 || yy < 0 || xx >= this.glowW || yy >= this.glowH) continue;
+      const i = (yy * this.glowW + xx) * 3;
       this.source[i] = f(
         Math.min(255, Math.round(this.source[i] * 255) + k.r * count) / 255,
       );
@@ -429,11 +484,12 @@ export class SoftwareRenderer {
     }
   }
   addGlow(x: number, y: number, color: number, alpha: number) {
-    // Whole-pixel origin: the aggregation map is indexed by pixel.
-    x = Math.floor(x);
-    y = Math.floor(y);
-    const extent = 24 * this.scale;
-    if (x >= this.width || y >= this.height || x + extent <= 0 || y + extent <= 0)
+    // Whole-pixel origin: the aggregation map is indexed by glow-field pixel.
+    const sub = this.glowSub;
+    x = Math.floor(x * sub);
+    y = Math.floor(y * sub);
+    const extent = 24 * this.scale * sub;
+    if (x >= this.glowW || y >= this.glowH || x + extent <= 0 || y + extent <= 0)
       return;
     if (!this.aggregateGlow) {
       this.glowStamp(x, y, color, alpha);
@@ -483,7 +539,9 @@ export class SoftwareRenderer {
     tint: number[] | null = null,
   ) {
     if (alpha <= 0) return;
-    if (this.native) {
+    // Downsampled glow rasterizes in glow-field space on the JS path.
+    const downsampledGlow = glow && this.glowSub < 1;
+    if (this.native && !downsampledGlow) {
       const c = rgb(color);
       if (glow) this.native.glow(corners, c[3], c[4], c[5], alpha);
       else
@@ -501,33 +559,45 @@ export class SoftwareRenderer {
       return;
     }
     const target = this.afterGlow ? this.output : this.scene;
-    const ax = corners[0],
-      ay = corners[1],
-      ux = corners[2] - ax,
-      uy = corners[3] - ay,
-      vx = corners[6] - ax,
-      vy = corners[7] - ay;
+    // A uniform scale of an affine quad's corners leaves its (u,v) texture
+    // sampling invariant — only the pixel grid and the accumulation target
+    // shrink.
+    let cs: ArrayLike<number> = corners;
+    if (downsampledGlow) {
+      const g = this.glowCorners,
+        sub = this.glowSub;
+      for (let i = 0; i < 8; i++) g[i] = corners[i] * sub;
+      cs = g;
+    }
+    const quadWidth = glow ? this.glowW : this.width,
+      quadHeight = glow ? this.glowH : this.height;
+    const ax = cs[0],
+      ay = cs[1],
+      ux = cs[2] - ax,
+      uy = cs[3] - ay,
+      vx = cs[6] - ax,
+      vy = cs[7] - ay;
     const det = ux * vy - uy * vx;
     if (Math.abs(det) < 1e-12) return;
     const x0 = clamp(
-        Math.floor(Math.min(corners[0], corners[2], corners[4], corners[6])),
+        Math.floor(Math.min(cs[0], cs[2], cs[4], cs[6])),
         0,
-        this.width,
+        quadWidth,
       ),
       x1 = clamp(
-        Math.ceil(Math.max(corners[0], corners[2], corners[4], corners[6])),
+        Math.ceil(Math.max(cs[0], cs[2], cs[4], cs[6])),
         0,
-        this.width,
+        quadWidth,
       );
     const y0 = clamp(
-        Math.floor(Math.min(corners[1], corners[3], corners[5], corners[7])),
+        Math.floor(Math.min(cs[1], cs[3], cs[5], cs[7])),
         0,
-        this.height,
+        quadHeight,
       ),
       y1 = clamp(
-        Math.ceil(Math.max(corners[1], corners[3], corners[5], corners[7])),
+        Math.ceil(Math.max(cs[1], cs[3], cs[5], cs[7])),
         0,
-        this.height,
+        quadHeight,
       );
     const c = rgb(color),
       cr = tint ? tint[0] : c[3],
@@ -602,7 +672,11 @@ export class SoftwareRenderer {
           }
         }
         if (glow) {
-          const i = (y * this.width + x) * 3;
+          // Fully transparent texels contribute exact zeros (unorm8 is
+          // idempotent) and the glow texture's margins are large: skipping
+          // them cuts the dominant RMW cost of the whole pipeline.
+          if (aa <= 0 || (r <= 0 && g <= 0 && bb <= 0)) continue;
+          const i = (y * quadWidth + x) * 3;
           this.source[i] = unorm8(this.source[i] + r * aa);
           this.source[i + 1] = unorm8(this.source[i + 1] + g * aa);
           this.source[i + 2] = unorm8(this.source[i + 2] + bb * aa);
@@ -689,6 +763,51 @@ export class SoftwareRenderer {
       );
     }
   }
+  // Bilinear upsample of the downsampled glow history into the
+  // full-resolution buffer the composers read. Clamped-edge bilinear matches
+  // the renderer's other texture sampling; runs once per glow frame when
+  // glowSub < 1.
+  private upsampleGlowHistory() {
+    const src = this.history,
+      dst = this.historyFull!,
+      gw = this.glowW,
+      gh = this.glowH,
+      sub = this.glowSub,
+      gw3 = gw * 3;
+    for (let y = 0; y < this.height; y++) {
+      const gy = clamp((y + 0.5) * sub - 0.5, 0, gh - 1),
+        sy0 = Math.floor(gy),
+        sy1 = Math.min(sy0 + 1, gh - 1),
+        fy = gy - sy0,
+        r0 = sy0 * gw3,
+        r1 = sy1 * gw3,
+        o = y * this.width * 3;
+      for (let x = 0; x < this.width; x++) {
+        const gx = clamp((x + 0.5) * sub - 0.5, 0, gw - 1),
+          sx0 = Math.floor(gx),
+          sx1 = Math.min(sx0 + 1, gw - 1),
+          fx = gx - sx0,
+          c0 = sx0 * 3,
+          c1 = sx1 * 3,
+          s00 = r0 + c0,
+          s10 = r0 + c1,
+          s01 = r1 + c0,
+          s11 = r1 + c1,
+          i = o + x * 3,
+          w00 = (1 - fx) * (1 - fy),
+          w10 = fx * (1 - fy),
+          w01 = (1 - fx) * fy,
+          w11 = fx * fy;
+        dst[i] =
+          src[s00] * w00 + src[s10] * w10 + src[s01] * w01 + src[s11] * w11;
+        dst[i + 1] =
+          src[s00 + 1] * w00 + src[s10 + 1] * w10 + src[s01 + 1] * w01 + src[s11 + 1] * w11;
+        dst[i + 2] =
+          src[s00 + 2] * w00 + src[s10 + 2] * w10 + src[s01 + 2] * w01 + src[s11 + 2] * w11;
+      }
+    }
+  }
+
   // Glow stamp for 1-2 px particle bodies (drawLong === false), shared by the
   // inlined body path in render()'s particle loop.
   particleGlow(p: Particle, color: number, ox: number, oy: number) {
@@ -702,15 +821,27 @@ export class SoftwareRenderer {
           extent = 24 * s,
           x = p.x * s - extent / 2 + ox,
           y = p.y * s - extent / 2 + oy;
-        this.rasterQuad(
-          [x, y, x + extent, y, x + extent, y + extent, x, y + extent],
-          color,
-          packed / 255,
-          this.glowTexture,
-          null,
-          true,
-          true,
-        );
+        if (this.glowSub < 1) {
+          // Downsampled field: stamp through the shared aggregation path.
+          // The textured quad costs ∝ extent² bilinear samples per particle
+          // (tens of millions per fullscreen frame); the precomputed kernel
+          // stamp costs ∝ its ≈45% nonzero taps and aggregates particles
+          // that share a field pixel. Subpixel position quantizes to the
+          // field grid — invisible after the field's blur and the bilinear
+          // upsample. Full-resolution glow keeps the quad's continuous
+          // positioning byte-for-byte.
+          this.addGlow(x, y, color, packed);
+        } else {
+          this.rasterQuad(
+            [x, y, x + extent, y, x + extent, y + extent, x, y + extent],
+            color,
+            packed / 255,
+            this.glowTexture,
+            null,
+            true,
+            true,
+          );
+        }
       } else {
         const s = this.scale;
         this.addGlow(
@@ -965,13 +1096,16 @@ export class SoftwareRenderer {
       if (p.delay <= 0 && p.elapsed >= 0 && !p.sprite.emissive) this.drawSprite(p.sprite, sim, p);
     if (advance && glow) {
       this.flushGlow();
-      if (this.native) this.native.blur();
-      else {
+      // Downsampled glow always runs the JS field pipeline; the wasm buffers
+      // are full resolution and only host glow at glowSub === 1.
+      if (this.native && this.glowSub === 1) {
+        this.native.blur();
+      } else {
         blurAxis(
           this.history,
           this.horizontal,
-          this.width,
-          this.height,
+          this.glowW,
+          this.glowH,
           false,
           0.1,
         );
@@ -980,13 +1114,13 @@ export class SoftwareRenderer {
         blurAxis(
           this.horizontal,
           this.vertical,
-          this.width,
-          this.height,
+          this.glowW,
+          this.glowH,
           true,
           1 / 12.2,
         );
       }
-      if (this.native) this.native.accumulate();
+      if (this.native && this.glowSub === 1) this.native.accumulate();
       else
         for (let i = 0, j = 0; i < this.history.length; i += 3, j++)
           for (let c = 0; c < 3; c++) {
@@ -996,6 +1130,7 @@ export class SoftwareRenderer {
               tap * 0.125 + (old * 0.95 + tap * 0.05),
             );
           }
+      if (this.historyFull) this.upsampleGlowHistory();
     }
     // With glow, monochrome and dithering all off, the shipped compose kernel
     // reduces to an RGB copy of the scene with alpha forced to 255 (verified
@@ -1011,22 +1146,25 @@ export class SoftwareRenderer {
       this.native.compose(glow);
     }
     else {
-      const output = this.native?.output ?? this.output;
+      const output = this.native?.output ?? this.output,
+        // Downsampled glow composes from the upsampled full-resolution
+        // history; at glowSub === 1 historyFull is null and this is history.
+        hist = this.historyFull ?? this.history;
       if (smoothGlow && glow) this.ditherNoise ??= glowDitherField(this.width, this.height);
       for (let p = 0, i = 0; p < this.width * this.height; p++, i += 4) {
-        const grayGlow = monochrome && glow ? Math.max(0, this.history[p * 3] - 0.008) * 0.2126 +
-          Math.max(0, this.history[p * 3 + 1] - 0.008) * 0.7152 + Math.max(0, this.history[p * 3 + 2] - 0.008) * 0.0722 : 0;
+        const grayGlow = monochrome && glow ? Math.max(0, hist[p * 3] - 0.008) * 0.2126 +
+          Math.max(0, hist[p * 3 + 1] - 0.008) * 0.7152 + Math.max(0, hist[p * 3 + 2] - 0.008) * 0.0722 : 0;
         let noise = 0;
         // Dither only the halo over untouched background. Foreground geometry,
         // flat backgrounds and late emissive sprites retain their exact pixels.
         if (smoothGlow && glow && background !== 0xffffff &&
             this.scene[i] === bg[0] && this.scene[i + 1] === bg[1] && this.scene[i + 2] === bg[2]) {
-          const amount = monochrome ? grayGlow : Math.max(0, this.history[p * 3] - 0.008, this.history[p * 3 + 1] - 0.008, this.history[p * 3 + 2] - 0.008);
+          const amount = monochrome ? grayGlow : Math.max(0, hist[p * 3] - 0.008, hist[p * 3 + 1] - 0.008, hist[p * 3 + 2] - 0.008);
           if (amount > 0) noise = this.ditherNoise![p] * Math.min(1, amount * 255);
         }
         for (let c = 0; c < 3; c++) {
           const color = this.scene[i + c] / 255,
-            g = monochrome ? grayGlow : glow ? Math.max(0, this.history[p * 3 + c] - 0.008) : 0;
+            g = monochrome ? grayGlow : glow ? Math.max(0, hist[p * 3 + c] - 0.008) : 0;
           output[i + c] =
             Math.max(
               color + g * 0.6,

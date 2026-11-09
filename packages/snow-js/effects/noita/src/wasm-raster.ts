@@ -48,6 +48,12 @@ export class WasmRaster {
     texture: RasterTexture,
     assets: Record<string, RasterTexture> = {},
     kernelExtent = 24,
+    // When false the full-resolution glow field buffers (source/horizontal/
+    // vertical/edges) are not allocated: the renderer then runs glow on its
+    // own downsampled JS field and only uses this instance for scene,
+    // composite and the history upsample target. glow()/stamp()/blur()/
+    // accumulate() must not be called in that mode.
+    glowField = true,
   ) {
     this.api = new WebAssembly.Instance(module).exports as unknown as RasterExports;
     this.width = width;
@@ -61,10 +67,10 @@ export class WasmRaster {
       return p;
     };
     const size = width * height * 3 * 4;
-    this.sourcePtr = alloc(size);
+    this.sourcePtr = glowField ? alloc(size) : 0;
     this.historyPtr = alloc(size);
-    this.horizontalPtr = alloc(size);
-    this.verticalPtr = alloc(size);
+    this.horizontalPtr = glowField ? alloc(size) : 0;
+    this.verticalPtr = glowField ? alloc(size) : 0;
     this.texturePtr = alloc(texture.rgba.byteLength);
     this.verticesPtr = alloc(64);
     this.scenePtr = alloc(width * height * 4);
@@ -73,7 +79,7 @@ export class WasmRaster {
     // enough up to scale 3, and larger scales overflowed this buffer.
     const kernelTaps = kernelExtent * kernelExtent;
     this.kernelPtr = alloc(kernelTaps * 5 * 8);
-    this.edgesPtr = alloc(width * height * 4);
+    this.edgesPtr = glowField ? alloc(width * height * 4) : 0;
     this.textures = new Map([[texture, this.texturePtr]]);
     for (const image of Object.values(assets))
       if (!this.textures.has(image))
@@ -81,14 +87,17 @@ export class WasmRaster {
     const memory = this.api.memory;
     if (next > memory.buffer.byteLength)
       memory.grow(Math.ceil((next - memory.buffer.byteLength) / 65536));
-    this.source = new Float32Array(memory.buffer, this.sourcePtr, size / 4);
+    if (glowField)
+      this.source = new Float32Array(memory.buffer, this.sourcePtr, size / 4);
     this.history = new Float32Array(memory.buffer, this.historyPtr, size / 4);
-    this.horizontal = new Float32Array(
-      memory.buffer,
-      this.horizontalPtr,
-      size / 4,
-    );
-    this.vertical = new Float32Array(memory.buffer, this.verticalPtr, size / 4);
+    if (glowField) {
+      this.horizontal = new Float32Array(
+        memory.buffer,
+        this.horizontalPtr,
+        size / 4,
+      );
+      this.vertical = new Float32Array(memory.buffer, this.verticalPtr, size / 4);
+    }
     this.vertices = new Float64Array(memory.buffer, this.verticesPtr, 8);
     this.scene = new Uint8ClampedArray(
       memory.buffer,
@@ -102,7 +111,8 @@ export class WasmRaster {
       this.outputPtr,
       width * height * 4,
     );
-    this.edges = new Float32Array(memory.buffer, this.edgesPtr, width * height);
+    if (glowField)
+      this.edges = new Float32Array(memory.buffer, this.edgesPtr, width * height);
     this.kernel = new Float64Array(memory.buffer, this.kernelPtr, kernelTaps * 5);
     for (const [image, pointer] of this.textures)
       new Uint8Array(memory.buffer, pointer, image.rgba.byteLength).set(
