@@ -2,14 +2,15 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   // dust's browser entries mirror dust/scripts/build.ts ENTRIES (the worker
   // URLs must stay in sync with it); bun test files and the manually run
-  // dust/scripts/*.ts tools are entry points too. The embed entry points come
-  // from snow-js's package.json exports.
+  // dust/scripts/*.ts tools are entry points too. The package.json exports
+  // (index.ts and dust/src/embed.ts) are entry points as well.
   "entry": [
+    "eslint.config.ts",
     "dust/src/meditation.ts",
     "dust/src/render-worker.ts",
     "dust/src/*.test.ts",
     "dust/scripts/*.ts"
   ],
-  "project": ["dust/src/**/*.ts", "dust/scripts/**/*.ts"],
+  "project": ["*.ts", "dust/src/**/*.ts", "dust/scripts/**/*.ts"],
   "ignoreBinaries": ["wat2wasm"]
 }

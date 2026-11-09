@@ -44,7 +44,6 @@ precision highp float;
 
 uniform float iTime;
 uniform vec2 iResolution;
-uniform vec2 iMouse;
 
 // LAYERS/DEPTH/WIDTH/SPEED of the original #defines, as runtime uniforms
 // ("light snow" defaults: 50/.5/.3/.6, "blizzard": 200/.1/.8/1.5).
@@ -55,7 +54,7 @@ uniform float speed;
 
 vec4 mainImage(in vec2 fragCoord) {
   const mat3 p = mat3(13.323122,23.5112,21.71123,21.1212,28.7312,11.9312,21.8112,14.7212,61.3934);
-  vec2 uv = (iMouse + vec2(1.,iResolution.y/iResolution.x)*fragCoord)/iResolution;
+  vec2 uv = vec2(1.,iResolution.y/iResolution.x)*fragCoord/iResolution;
   vec3 acc = vec3(0.0);
   float dof = 5.*sin(iTime*.1);
   // WebGL1 requires a constant loop bound; layers selects how many run.
@@ -91,7 +90,7 @@ export type Options = {
   opacity: number,
 };
 
-export const defaultOptions: Options = {
+const defaultOptions: Options = {
   isDark: 0,
   gradientIntensity: 0.05,
   iGradient: [0.0, 0.8, 1.0, 1.0],
@@ -101,7 +100,7 @@ export const defaultOptions: Options = {
 };
 
 // https://www.shadertoy.com/view/4sX3z2
-export const FRAGMENT_GLSL = `
+const FRAGMENT_GLSL = `
 precision highp float;
 
 uniform float iTime;
