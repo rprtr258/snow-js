@@ -3,11 +3,9 @@ import type {EffectDefinition, EffectInstance, OptionValues} from "./effect.ts";
 import creation from "./effects/creation/index.ts";
 import dust from "./effects/dust/index.ts";
 import snow from "./effects/snow/index.ts";
-import snowfall from "./effects/snowfall/index.ts";
 
 export const EFFECTS = {
   snow,
-  snowfall,
   creation,
   dust,
 };

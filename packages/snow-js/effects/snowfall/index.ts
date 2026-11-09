@@ -1,5 +1,6 @@
 // Layered snowfall ("light snow" / "blizzard" shadertoy adaptation,
-// https://www.shadertoy.com/view/ldsGDn).
+// https://www.shadertoy.com/view/ldsGDn). Own shader module, consumed by the
+// snow effect's "snowfall" preset; not a standalone registry entry.
 import {defineEffect, num, type InferOptions} from "../../effect.ts";
 import {createShaderEffect, type UniformMap} from "../snow-runner.ts";
 
@@ -45,7 +46,7 @@ void main(void) {
 }
 `;
 
-const options = {
+export const options = {
   layers: num(50, {label: "layers", min: 50, max: 200}),
   depth: num(0.5, {label: "depth", min: 0.1, max: 0.5}),
   width: num(0.3, {label: "width", min: 0.3, max: 0.8}),

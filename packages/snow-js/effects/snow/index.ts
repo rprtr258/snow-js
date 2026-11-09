@@ -1,5 +1,9 @@
-// Flat snowfall over a gradient (https://www.shadertoy.com/view/4sX3z2).
-import {bool, color, defineEffect, num, type InferOptions} from "../../effect.ts";
+// Two presets in one effect: flat snow over a gradient
+// (https://www.shadertoy.com/view/4sX3z2) and layered snowfall, whose shader
+// and options live separately in ../snowfall. The preset option picks which
+// shader runs; option visibility follows it.
+import {bool, color, defineEffect, num, select, type EffectInstance, type InferOptions, type OptionValues} from "../../effect.ts";
+import snowfall, {options as snowfallOptions} from "../snowfall/index.ts";
 import {createShaderEffect, type UniformMap} from "../snow-runner.ts";
 
 const FRAGMENT_GLSL = `
@@ -103,14 +107,26 @@ function hexToVec4(hex: string): [number, number, number, number] {
   throw new Error("Invalid hex color");
 }
 
+type SnowPreset = "snow" | "snowfall";
+
 const options = {
+  preset: select<SnowPreset>("snow", {label: "preset", entries: [
+    {value: "snow", label: "snow"},
+    {value: "snowfall", label: "snowfall"},
+  ]}),
   speed: num(10, {label: "speed", min: 0, max: 20}),
-  isDark: bool(true, {label: "isDark"}),
-  gradientIntensity: num(0.3, {label: "gradientIntensity", min: 0, max: 1}),
-  gradient: color("#00ccff", {label: "gradient"}),
-  amount: num(0.5, {label: "amount", min: 0.01, max: 0.5}),
-  size: num(1, {label: "size", min: 0.4, max: 2}),
-  opacity: num(1, {label: "opacity", min: 0.3, max: 3}),
+  // snow preset
+  isDark: bool(true, {label: "isDark", visible: (v) => v["preset"] !== "snowfall"}),
+  gradientIntensity: num(0.3, {label: "gradientIntensity", min: 0, max: 1, visible: (v) => v["preset"] !== "snowfall"}),
+  gradient: color("#00ccff", {label: "gradient", visible: (v) => v["preset"] !== "snowfall"}),
+  amount: num(0.5, {label: "amount", min: 0.01, max: 0.5, visible: (v) => v["preset"] !== "snowfall"}),
+  size: num(1, {label: "size", min: 0.4, max: 2, visible: (v) => v["preset"] !== "snowfall"}),
+  opacity: num(1, {label: "opacity", min: 0.3, max: 3, visible: (v) => v["preset"] !== "snowfall"}),
+  // snowfall preset (option specs owned by the snowfall shader module)
+  layers: {...snowfallOptions.layers, visible: (v: OptionValues) => v["preset"] === "snowfall"},
+  depth: {...snowfallOptions.depth, visible: (v: OptionValues) => v["preset"] === "snowfall"},
+  width: {...snowfallOptions.width, visible: (v: OptionValues) => v["preset"] === "snowfall"},
+  drift: {...snowfallOptions.drift, visible: (v: OptionValues) => v["preset"] === "snowfall"},
 };
 type SnowValues = InferOptions<typeof options>;
 
@@ -125,13 +141,62 @@ function toUniforms(values: SnowValues): UniformMap {
   };
 }
 
-export default defineEffect({
-  label: "Snow",
-  options,
-  create: (el, values) => createShaderEffect(el, {
+function createSnowShader(el: Element, values: SnowValues): EffectInstance {
+  return createShaderEffect(el, {
     fragment: FRAGMENT_GLSL,
     values,
     toUniforms,
     speedOf: (v) => v.speed,
-  }),
+  });
+}
+
+// Each preset runs its own shader: this wrapper swaps the underlying shader
+// effect when the preset option changes, keeping all edited values.
+class PresetSnowEffect implements EffectInstance {
+  private readonly el: Element;
+  private values: SnowValues;
+  private inner: EffectInstance;
+  private started = false;
+
+  constructor(el: Element, values: SnowValues) {
+    this.el = el;
+    this.values = values;
+    this.inner = this.instantiate(values);
+  }
+
+  private instantiate(values: SnowValues): EffectInstance {
+    if (values.preset === "snowfall")
+      return snowfall.create(this.el, values);
+    return createSnowShader(this.el, values);
+  }
+
+  start(): void {
+    this.started = true;
+    this.inner.start();
+  }
+  stop(): void {
+    this.started = false;
+    this.inner.stop();
+  }
+  update(options: Partial<OptionValues>): void {
+    const previousPreset = this.values.preset;
+    this.values = {...this.values, ...options};
+    if (this.values.preset === previousPreset) {
+      this.inner.update(options);
+      return;
+    }
+    this.inner.unmount();
+    this.inner = this.instantiate(this.values);
+    if (this.started)
+      this.inner.start();
+  }
+  unmount(): void {
+    this.inner.unmount();
+  }
+}
+
+export default defineEffect({
+  label: "Snow",
+  options,
+  create: (el, values) => new PresetSnowEffect(el, values),
 });

@@ -21,9 +21,11 @@ instance.update({amount: 0.2}); // live option updates
 instance.unmount();
 ```
 
-Effects available: `snow`, `snowfall`, `creation`, `dust` — each fills its own
+Effects available: `snow`, `creation`, `dust` — each fills its own
 options struct (checked against the effect's schema at compile time via the
-typed `createEffect` overload).
+typed `createEffect` overload). `snow` ships two presets selectable via its
+`preset` option: `snow` (flat gradient snow, the default) and `snowfall`
+(layered blizzard); the visible settings follow the chosen preset.
 
 ## Adding a new effect
 
@@ -71,8 +73,11 @@ packages/snow-js/
   glsl.ts              WebGL quad renderer (shader effects)
   effects/
     snow-runner.ts     shared lifecycle for fragment-shader effects
-    snow/              "Snow" — gradient snowfall (shadertoy 4sX3z2)
-    snowfall/          "Snowfall" — layered blizzard (shadertoy ldsGDn)
+    snow/              "Snow" — preset "snow": flat gradient snow
+                       (shadertoy 4sX3z2); preset "snowfall": layered
+                       blizzard (shadertoy ldsGDn)
+    snowfall/          the snowfall shader + options, used by snow's
+                       "snowfall" preset (not a standalone effect)
     creation/          "Creation" — psychedelic tunnel (pouet 57245)
     dust/              "Dust" — Noita portals, objects, original math figures
       src/             ported simulation + software renderer + embed viewer
