@@ -7,7 +7,8 @@ import { ViewerRuntime } from "./viewer-runtime";
 import { EFFECTS } from "./portal-physics";
 import { MATH_EFFECTS } from "./math-figures";
 import { MATH_TRAIL_SCALE } from "./math-settings";
-import { PREVIEW_HEIGHT, RESOLUTION_SCALE } from "./render-resolution";
+import { compileRenderKernel } from "./render-kernel";
+import { fullscreenView, PREVIEW_HEIGHT, RESOLUTION_SCALE } from "./render-resolution";
 import { Catalog, RawOptions, SimulationOptions } from "./types";
 
 // wasm-raster.ts resolves raster.wasm relative to src/, which only exists in
@@ -31,11 +32,24 @@ export type DustOptions = {
   effect: string;
   speed: number;
   zoom: number;
+  // Fullscreen geometry (the meditation page's): the render buffer is the
+  // host's device pixels and the portal spans half the smaller dimension.
+  // Default off keeps the fixed 320px preview buffer.
+  fullscreen: boolean;
+  // Emission density multiplier; fullscreen mode adds the meditation page's
+  // derived scale×2 boost on top (computeDensity).
+  density: number;
   core: boolean;
   glow: boolean;
+  portalSprite: boolean;
   color: string | null;
   background: string | null;
   mathTrailScale: number;
+  minTrailLifetime: number;
+  ambientRing: boolean;
+  fastParticles: boolean;
+  cullInvisible: boolean;
+  particleMirror: boolean;
   seed: number;
   x: number;
   y: number;
@@ -47,11 +61,19 @@ const defaults: DustOptions = {
   effect: "meditation",
   speed: 1,
   zoom: 1,
+  fullscreen: false,
+  density: 1,
   core: true,
   glow: true,
+  portalSprite: true,
   color: null,
   background: null,
   mathTrailScale: MATH_TRAIL_SCALE.default,
+  minTrailLifetime: 0.35,
+  ambientRing: true,
+  fastParticles: false,
+  cullInvisible: false,
+  particleMirror: false,
   seed: 0,
   x: 0,
   y: 0,
@@ -99,6 +121,7 @@ type WorkerRequest = {
   catalog?: Catalog;
   buffer?: ArrayBuffer;
   kernelModule?: WebAssembly.Module | null;
+  renderKernelModule?: WebAssembly.Module | null;
 };
 type PreviewMessage = {
   type: string;
@@ -126,6 +149,31 @@ function bufferSize(width: number, height: number) {
   };
 }
 
+// Render view for the two geometry modes. Preview (default): the fixed
+// 320px-tall buffer at one world cell = one pixel. Fullscreen (the
+// meditation page's geometry): the buffer is the host's device pixels and
+// the portal spans half the smaller device dimension; zoom still applies
+// on top.
+export function computeView(
+  width: number,
+  height: number,
+  pixelRatio: number,
+  fullscreen: boolean,
+  zoom: number,
+): {width: number; height: number; scale: number} {
+  if (!fullscreen)
+    return {...bufferSize(width, height), scale: RESOLUTION_SCALE * clampZoom(zoom)};
+  const view = fullscreenView(width, height, pixelRatio);
+  return {width: view.width, height: view.height, scale: view.scale * clampZoom(zoom)};
+}
+
+// Emission density: the density option scales the native rate; fullscreen
+// mode derives the meditation page's scale×2 boost so on-screen particle
+// density matches one cell = one pixel at any viewport size.
+export function computeDensity(fullscreen: boolean, density: number, scale: number) {
+  return density * (fullscreen ? scale * 2 : 1);
+}
+
 export class Dust {
   options: DustOptions;
   private container: Element;
@@ -135,6 +183,8 @@ export class Dust {
   private inline: ViewerRuntime | null = null;
   private catalog: Catalog | null = null;
   private kernelModule: WebAssembly.Module | null = null;
+  private renderKernelModule: WebAssembly.Module | null = null;
+  private resizeTimer: ReturnType<typeof setTimeout> | null = null;
   // Init-time effects.bin; detached once transferred to the worker, and
   // re-fetched by the main-thread fallback when the worker took it.
   private initBuffer: ArrayBuffer | null = null;
@@ -174,18 +224,25 @@ export class Dust {
     };
   }
 
+  private geometry() {
+    return computeView(
+      this.hostSize().width,
+      this.hostSize().height,
+      window.devicePixelRatio || 1,
+      this.options.fullscreen,
+      this.options.zoom,
+    );
+  }
+
   private view(): WorkerRequest {
-    return {
-      type: "view",
-      ...bufferSize(this.hostSize().width, this.hostSize().height),
-      scale: RESOLUTION_SCALE * clampZoom(this.options.zoom),
-    };
+    return {type: "view", ...this.geometry()};
   }
 
   private rawOptions(): RawOptions {
     return {
       core: this.options.core,
       glow: this.options.glow,
+      portalSprite: this.options.portalSprite,
       color: this.options.color,
       background: this.options.background,
     };
@@ -198,25 +255,38 @@ export class Dust {
       x: clampWorld(this.options.x),
       y: clampWorld(this.options.y),
       startFrame: 0,
+      density: computeDensity(
+        this.options.fullscreen,
+        this.options.density,
+        this.geometry().scale,
+      ),
+      minTrailLifetime: this.options.minTrailLifetime,
+      ambientRing: this.options.ambientRing,
+      fastParticles: this.options.fastParticles,
+      cullInvisible: this.options.cullInvisible,
+      particleMirror: this.options.particleMirror,
     };
   }
 
   private async init() {
     try {
-      const [catalog, bin, kernelModule] = await Promise.all([
+      const [catalog, bin, kernelModule, renderKernelModule] = await Promise.all([
         loadCatalog(),
         fetchBin(),
         loadEmbedRasterModule(),
+        compileRenderKernel(),
       ]);
       if (this.disposed) return;
       this.catalog = catalog;
       this.kernelModule = kernelModule;
+      this.renderKernelModule = renderKernelModule;
       const view = this.view();
       const init: WorkerRequest = {
         type: "init",
         catalog,
         buffer: bin,
         kernelModule,
+        renderKernelModule,
         width: view.width,
         height: view.height,
         scale: view.scale,
@@ -268,7 +338,7 @@ export class Dust {
         message.width!,
         message.height!,
         this.kernelModule,
-        {scale: message.scale!},
+        {scale: message.scale!, renderKernelModule: this.renderKernelModule},
       );
       this.inline.restart(this.replay(), this.revision);
       const result = this.inline.frame({
@@ -366,6 +436,19 @@ export class Dust {
 
   private resize() {
     if (this.disposed) return;
+    if (this.options.fullscreen) {
+      // The derived emission density tracks the view scale, so a fullscreen
+      // resize rebuilds the view and the replay like the meditation page
+      // (debounced; dragging a window edge would otherwise restart per frame).
+      if (this.resizeTimer !== null) clearTimeout(this.resizeTimer);
+      this.resizeTimer = setTimeout(() => {
+        this.resizeTimer = null;
+        if (this.disposed || !this.ready) return;
+        this.applyView();
+        this.restart();
+      }, 200);
+      return;
+    }
     this.applyView();
   }
 
@@ -416,18 +499,40 @@ export class Dust {
     const previous = this.options;
     this.options = {...previous, ...options};
     if (!this.ready) return;
-    const replayKeys: (keyof DustOptions)[] = ["collection", "effect", "seed", "x", "y"];
+    const replayKeys: (keyof DustOptions)[] = [
+      "collection",
+      "effect",
+      "seed",
+      "x",
+      "y",
+      "density",
+      "minTrailLifetime",
+      "ambientRing",
+      "fastParticles",
+      "cullInvisible",
+      "particleMirror",
+    ];
     if (replayKeys.some((key) => previous[key] !== this.options[key])) {
       this.restart();
       return;
     }
-    if (previous.zoom !== this.options.zoom) {
+    if (previous.fullscreen !== this.options.fullscreen) {
+      // The view geometry and the derived density both change with the mode.
       this.applyView();
+      this.restart();
+      return;
+    }
+    if (previous.zoom !== this.options.zoom) {
+      // In fullscreen mode zoom rescales the derived density, so the replay
+      // must be re-sent; the preview buffer keeps its restart-free zoom.
+      this.applyView();
+      if (this.options.fullscreen) this.restart();
       return;
     }
     if (
       previous.core !== this.options.core ||
       previous.glow !== this.options.glow ||
+      previous.portalSprite !== this.options.portalSprite ||
       previous.color !== this.options.color ||
       previous.background !== this.options.background
     ) {
@@ -476,6 +581,10 @@ export class Dust {
   }
   unmount() {
     this.disposed = true;
+    if (this.resizeTimer !== null) {
+      clearTimeout(this.resizeTimer);
+      this.resizeTimer = null;
+    }
     this.stop();
     this.worker?.terminate();
     this.worker = null;
