@@ -1,8 +1,8 @@
-// Two presets in one effect: flat snow over a gradient
+// Two presets in one effect: flat snow
 // (https://www.shadertoy.com/view/4sX3z2) and layered snowfall, whose shader
 // and options live separately in ../snowfall. The preset option picks which
 // shader runs; option visibility follows it.
-import {bool, color, defineEffect, num, select, type EffectInstance, type InferOptions, type OptionValues} from "../../effect.ts";
+import {bool, defineEffect, num, select, type EffectInstance, type InferOptions, type OptionValues} from "../../effect.ts";
 import snowfall, {options as snowfallOptions} from "../snowfall/index.ts";
 import {createShaderEffect, type UniformMap} from "../snow-runner.ts";
 
@@ -14,8 +14,6 @@ uniform vec2 iResolution;
 uniform vec2 iMouse;
 
 uniform float isDark;
-uniform float gradientIntensity;
-uniform vec4 iGradient;
 uniform float amount;
 uniform float size;
 uniform float opacity;
@@ -27,23 +25,11 @@ vec2 sincos(float angle) {
   return vec2(cos(angle), sin(angle));
 }
 
-vec4 blendOver(vec4 src, vec4 dst) {
-  float outA = src.a + dst.a * (1.0 - src.a);
-  vec3 num = src.rgb * src.a + dst.rgb * dst.a * (1.0 - src.a);
-  if (outA > 0.0) {
-    return vec4(num / outA, outA);
-  } else {
-    return vec4(0.0); // fully transparent
-  }
-}
-
 vec4 mainImage(in vec2 fragCoord) {
   vec2 p = fragCoord.xy / iResolution.x;
   float snow = 0.0;
 
   // p += (vec2(-iMouse.x, +iMouse.y) / iResolution - 0.5) / 10.0;
-
-  vec4 gradient = (1.0 - p.y) * gradientIntensity * iGradient;
 
   for (int k = 0; k < 6; k++) {
     for (int i = 0; i < SNOW_LAYERS; i++) {
@@ -73,39 +59,16 @@ vec4 mainImage(in vec2 fragCoord) {
 
   if (isDark < 0.5) {
     // invertedColor
-    return vec4(-vec3(snow).rgb, snow) + gradient;
+    return vec4(-vec3(snow).rgb, snow);
   }
 
-  return blendOver(vec4(snow), gradient);
+  return vec4(snow);
 }
 
 void main(void) {
   gl_FragColor = mainImage(gl_FragCoord.xy);
 }
 `;
-
-function hexToVec4(hex: string): [number, number, number, number] {
-  let raw = hex;
-  if (raw.startsWith("#"))
-    raw = raw.slice(1);
-  if (raw.length === 3) {
-    return [
-      parseInt(raw[0] + raw[0], 16) / 255,
-      parseInt(raw[1] + raw[1], 16) / 255,
-      parseInt(raw[2] + raw[2], 16) / 255,
-      1,
-    ];
-  }
-  if (raw.length === 6) {
-    return [
-      parseInt(raw.slice(0, 2), 16) / 255,
-      parseInt(raw.slice(2, 4), 16) / 255,
-      parseInt(raw.slice(4, 6), 16) / 255,
-      1,
-    ];
-  }
-  throw new Error("Invalid hex color");
-}
 
 type SnowPreset = "snow" | "snowfall";
 
@@ -117,8 +80,6 @@ const options = {
   speed: num(10, {label: "speed", min: 0, max: 20}),
   // snow preset
   isDark: bool(true, {label: "isDark", visible: (v) => v["preset"] !== "snowfall"}),
-  gradientIntensity: num(0.3, {label: "gradientIntensity", min: 0, max: 1, visible: (v) => v["preset"] !== "snowfall"}),
-  gradient: color("#00ccff", {label: "gradient", visible: (v) => v["preset"] !== "snowfall"}),
   amount: num(0.5, {label: "amount", min: 0.01, max: 0.5, visible: (v) => v["preset"] !== "snowfall"}),
   size: num(1, {label: "size", min: 0.4, max: 2, visible: (v) => v["preset"] !== "snowfall"}),
   opacity: num(1, {label: "opacity", min: 0.3, max: 3, visible: (v) => v["preset"] !== "snowfall"}),
@@ -133,8 +94,6 @@ type SnowValues = InferOptions<typeof options>;
 function toUniforms(values: SnowValues): UniformMap {
   return {
     isDark: values.isDark ? 1 : 0,
-    gradientIntensity: values.gradientIntensity,
-    iGradient: hexToVec4(values.gradient),
     amount: values.amount,
     size: values.size,
     opacity: values.opacity,

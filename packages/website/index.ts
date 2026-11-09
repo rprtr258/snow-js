@@ -10,10 +10,28 @@ const effectContainer = document.querySelector<HTMLDivElement>(".effect-containe
 const backgroundConfig = {
   color: "#000000",
   image: "",
+  gradient: "#00ccff",
+  gradientIntensity: 0.3,
   size: "cover",
   position: "50% 50%",
   repeat: "no-repeat",
 };
+
+function withAlpha(hex: string, alpha: number): string {
+  const value = parseInt(hex.slice(1), 16);
+  return `rgba(${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255}, ${alpha})`;
+}
+
+// Gradient layer over image layer: the gradient used to be drawn by the snow
+// shader on top of the page, so it keeps sitting above the image.
+function applyBackgroundImage(): void {
+  const layers: string[] = [];
+  if (backgroundConfig.gradientIntensity > 0)
+    layers.push(`linear-gradient(to top, ${withAlpha(backgroundConfig.gradient, backgroundConfig.gradientIntensity)}, transparent)`);
+  if (backgroundConfig.image !== "")
+    layers.push(`url(${backgroundConfig.image})`);
+  effectContainer.style.backgroundImage = layers.join(", ");
+}
 
 /** active effect */
 const effectState = {effect: "snow"};
@@ -76,10 +94,13 @@ background.addBinding(backgroundConfig, "color").on("change", ({value}) => {
   effectContainer.style.backgroundColor = value;
   current?.instance.update({background: String(value)});
 });
-background.addBinding(backgroundConfig, "image").on("change", ({value}) => { effectContainer.style.backgroundImage = `url(${value})`; });
+background.addBinding(backgroundConfig, "image").on("change", applyBackgroundImage);
+background.addBinding(backgroundConfig, "gradient").on("change", applyBackgroundImage);
+background.addBinding(backgroundConfig, "gradientIntensity", {min: 0, max: 1}).on("change", applyBackgroundImage);
 background.addBinding(backgroundConfig, "size").on("change", ({value}) => { effectContainer.style.backgroundSize = value; });
 background.addBinding(backgroundConfig, "position").on("change", ({value}) => { effectContainer.style.backgroundPosition = value; });
 background.addBinding(backgroundConfig, "repeat").on("change", ({value}) => { effectContainer.style.backgroundRepeat = value; });
+applyBackgroundImage();
 
 /** monitors */
 const monitors = pane.addFolder({title: "monitors", expanded: true});
