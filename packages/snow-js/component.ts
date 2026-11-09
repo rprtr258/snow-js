@@ -1,5 +1,5 @@
 import {GL} from "./glsl.ts";
-import {defaultOptions, FRAGMENT_GLSL, VERTEX_GLSL, type Options} from "./presets.ts";
+import {PRESETS, VERTEX_GLSL, type Options, type PresetKey, type SnowOptions} from "./presets.ts";
 // export type Options;
 
 function createCanvasNode(el: Element): HTMLCanvasElement {
@@ -19,9 +19,10 @@ function createCanvasNode(el: Element): HTMLCanvasElement {
 }
 
 export class Snow {
-  options: Record<string, number | [number, number, number, number]>;
+  options: SnowOptions;
   _speed: number;
   _time: number;
+  preset: PresetKey;
   canvas: HTMLCanvasElement;
   render: GL;
 
@@ -30,17 +31,20 @@ export class Snow {
     speed: number,
     options: Partial<Options>,
     externalTimeUse: boolean,
+    preset: PresetKey = "default",
   ) {
-    this.options = {...defaultOptions, ...options};
+    const {fragment, defaultOptions: presetDefaults} = PRESETS[preset];
+    this.options = {...presetDefaults, ...options};
     this._time = 0;
     this._speed = speed;
+    this.preset = preset;
     this.canvas = createCanvasNode(el);
-    const keys = Object.keys(defaultOptions);
+    const keys = Object.keys(presetDefaults);
     const startTime = Date.now();
     this.render = new GL(
       this.canvas,
       VERTEX_GLSL,
-      FRAGMENT_GLSL,
+      fragment,
       {
         renderHook: () => {
           const gl = this.render;
@@ -72,8 +76,8 @@ export class Snow {
   stop() {
     this.render.running = false;
   }
-  update(options: Partial<Options>) {
-    this.options = {...defaultOptions, ...options};
+  update(options: SnowOptions) {
+    this.options = {...PRESETS[this.preset].defaultOptions, ...options};
   }
   mount() {
   }

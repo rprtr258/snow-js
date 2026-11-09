@@ -1,6 +1,6 @@
 import {/*FolderApi, */Pane} from "tweakpane";
 import * as EssentialsPlugin from "@tweakpane/plugin-essentials";
-import {Snow, type Options} from "snow-js";
+import {Snow, type Options, type PresetKey, type SnowOptions} from "snow-js";
 import {
   Dust,
   dustDefaults,
@@ -66,21 +66,25 @@ function toInner(): Options {
   };
 }
 
-// const snow2Options = {
-//   layers: 50,
-//   depth: .5,
-//   width: .3,
-//   speed: .6,
-// };
+const snow2Options = {
+  layers: 50,
+  depth: .5,
+  width: .3,
+  speed: .6,
+};
 
-// type Params =
-//   | {preset: "default", options: Options}
-//   | {preset: "snow2", options: typeof snow2Options}
-//   | {preset: "creation", options: []};
-// const params = {
-//   preset: "default",
-//   options: options,
-// };
+const snowState: {preset: PresetKey} = {preset: "default"};
+
+function toSnowOptions(): SnowOptions {
+  switch (snowState.preset) {
+    case "default":
+      return toInner();
+    case "snow2":
+      return {...snow2Options};
+    case "creation":
+      return {};
+  }
+}
 
 const backgroundConfig = {
   color: "#000000",
@@ -103,8 +107,15 @@ function resetBackground() {
   pane.refresh();
 }
 
-const snow = new Snow(effectContainer, commonOptions.speed, toInner(), false);
+let snow = new Snow(effectContainer, commonOptions.speed, toSnowOptions(), false, snowState.preset);
 snow.start();
+
+function mountSnow(): void {
+  // GL compiles the shader at construction, so preset switches rebuild it.
+  snow.unmount();
+  snow = new Snow(effectContainer, commonOptions.speed, toSnowOptions(), false, snowState.preset);
+  snow.start();
+}
 
 /** card */
 const cardConfig = {
@@ -201,18 +212,49 @@ pane.addBinding(effectState, "effect", {
 
 /** snow options */
 const snowFolder = pane.addFolder({title: "snow", expanded: true});
-snowFolder.addBinding(options, "isDark");
-snowFolder.addBinding(options, "gradientIntensity", {min: 0, max: 1});
-snowFolder.addBinding(options, "gradient");
-snowFolder.addBinding(options, "amount", {min: 0.01, max: 0.5});
-snowFolder.addBinding(options, "size", {min: 0.4, max: 2});
-snowFolder.addBinding(options, "opacity", {min: 0.3, max: 3});
-snowFolder.addBinding(commonOptions, "speed", {min: 0, max: 20});
-snowFolder.addBinding({get time(): number {return snow._time;}}, "time", {
-  view: "number",
-  label: "time",
-  readonly: true,
-});
+function rebuildSnowControls() {
+  for (const child of [...snowFolder.children])
+    snowFolder.remove(child);
+  snowFolder.addBinding(snowState, "preset", {
+    label: "preset",
+    options: {
+      "Default": "default",
+      "Other snow example": "snow2",
+      "Creation": "creation",
+    },
+  }).on("change", ({value}) => {
+    snowState.preset = value;
+    mountSnow();
+    // The rebuild disposes the blade that fired this event; defer it past
+    // the dispatch so tweakpane never touches a disposed view.
+    setTimeout(rebuildSnowControls, 0);
+  });
+  switch (snowState.preset) {
+    case "default":
+      snowFolder.addBinding(options, "isDark");
+      snowFolder.addBinding(options, "gradientIntensity", {min: 0, max: 1});
+      snowFolder.addBinding(options, "gradient");
+      snowFolder.addBinding(options, "amount", {min: 0.01, max: 0.5});
+      snowFolder.addBinding(options, "size", {min: 0.4, max: 2});
+      snowFolder.addBinding(options, "opacity", {min: 0.3, max: 3});
+      break;
+    case "snow2":
+      snowFolder.addBinding(snow2Options, "layers", {min: 50, max: 200});
+      snowFolder.addBinding(snow2Options, "depth", {min: .1, max: .5});
+      snowFolder.addBinding(snow2Options, "width", {min: .3, max: .8});
+      snowFolder.addBinding(snow2Options, "speed", {min: .6, max: 1.5});
+      break;
+    case "creation":
+      break;
+  }
+  snowFolder.addBinding(commonOptions, "speed", {min: 0, max: 20});
+  snowFolder.addBinding({get time(): number {return snow._time;}}, "time", {
+    view: "number",
+    label: "time",
+    readonly: true,
+  });
+}
+rebuildSnowControls();
 
 /** dust options */
 const dustFolder = pane.addFolder({title: "dust", expanded: true});
@@ -311,48 +353,11 @@ void dustEffectGroups().then((groups) => {
 
 pane.on("change", (e) => {
   void e;
-  // if (e.target.label === "preset")
-  //   rebuild();
   if (effectState.effect !== "snow")
     return;
-  snow.update(toInner());
+  snow.update(toSnowOptions());
   snow.speed = commonOptions.speed;
 });
-
-// const varsFolder: FolderApi = pane.addFolder({title: "Configuration"});
-
-// function rebuild() {
-//   for (const child of varsFolder.children)
-//     varsFolder.remove(child);
-
-//   varsFolder.addBinding(params, "preset", {
-//     options: {
-//       "Default": "default",
-//       "Other snow example": "snow2",
-//       "Creation": "creation",
-//     },
-//   });
-//   switch (params.preset) {
-//     case "default":
-//       varsFolder.addBinding(options, "isDark");
-//       varsFolder.addBinding(options, "gradientIntensity", {min: 0, max: 0.3});
-//       varsFolder.addBinding(options, "amount", {min: 0.01, max: 0.5});
-//       varsFolder.addBinding(options, "speed", {min: 1, max: 20});
-//       varsFolder.addBinding(options, "size", {min: 0.4, max: 2});
-//       varsFolder.addBinding(options, "opacity", {min: 0.3, max: 3});
-//       break;
-//     case "snow2":
-//       varsFolder.addBinding(snow2Options, "layers", {min: 50, max: 200});
-//       varsFolder.addBinding(snow2Options, "depth", {min: .1, max: .5});
-//       varsFolder.addBinding(snow2Options, "width", {min: .3, max: .8});
-//       varsFolder.addBinding(snow2Options, "speed", {min: .6, max: 1.5});
-//       break;
-//     case "creation":
-//       break;
-//   }
-// }
-
-// rebuild();
 
 /** background */
 const background = pane.addFolder({title: "background", expanded: false});
