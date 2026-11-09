@@ -38,7 +38,9 @@ vec4 mainImage(in vec2 fragCoord) {
       vec2 uv = p + vec2(0.01, downSpeed) * vec2(
         sin((iTime + float(k * 6185)) * 0.6 + float(i)),
         iTime + float(k * 1352)
-      ) * vec2(5.0, 1.0) / float(i);
+      // max guards i=0: dividing by float(0) yields inf/NaN, which turned the
+      // largest-flake layer (cellSize 5) into a dead/NaN layer.
+      ) * vec2(5.0, 1.0) / max(float(i), 1.0);
       vec2 uvStep = ceil(uv * cellSize - 0.5) / cellSize;
       vec2 tmp = fract(sin(vec2((mat2(
         13.0, 78.0,
@@ -48,7 +50,19 @@ vec4 mainImage(in vec2 fragCoord) {
         23.0, 95.0
       )) * uvStep)) * vec2(43758.0, 62159.0) + float(k) * 12.0) - 0.5;
       vec2 randomMagnitude = sincos(iTime * 2.5) * 0.7 / cellSize;
-      float d = 5.0 * distance((uvStep + vec2(tmp.x * sin(tmp.y), tmp.y) * randomMagnitude.x + vec2(tmp.y, tmp.x) * randomMagnitude.y), uv);
+      // Without a per-cell offset every particle sits on the lattice line
+      // x = m/cellSize and the shared-phase wiggle leaves vertical mid-cell
+      // voids (striping). tmp/cellSize spreads anchors across the cell, faded
+      // per axis by gamma so the flake's whole disc always stays strictly
+      // inside its own cell: a flake is only ever rendered through its own
+      // cell's pixels, so crossing the cell edge would clip the dot and
+      // leaving the cell would make it blink out of existence. wmax bounds the
+      // per-axis wiggle amplitude (|A*cos + B*sin| <= length(A, B)); blob is
+      // the dot's radius in cell units (size-dependent).
+      vec2 wmax = 0.7 * vec2(length(vec2(tmp.x * sin(tmp.y), tmp.y)), length(tmp));
+      float blob = 1.9 * size / (5.0 * (15.0 + tmp.x * 6.3));
+      vec2 gamma = clamp((0.5 - blob - wmax) / (abs(tmp) + 1e-4), 0.0, 1.0);
+      float d = 5.0 * distance((uvStep + tmp * gamma / cellSize + vec2(tmp.x * sin(tmp.y), tmp.y) * randomMagnitude.x + vec2(tmp.y, tmp.x) * randomMagnitude.y), uv);
       float omiVal = fract(sin(dot(uvStep, vec2(32.0, 94.0))) * 31572.0);
       if (omiVal < amount) {
         float newd = (tmp.x + 1.0) * 0.4 * clamp(1.9 - d * (15.0 + (tmp.x * 6.3)) * (cellSize / size), 0.0, 1.0);
