@@ -5,7 +5,13 @@ import importPlugin from "eslint-plugin-import";
 
 export default defineConfig([
   {
+    ignores: ["**/dist/", "**/node_modules/"],
+  },
+  {
+    // snow-js sources: strict house style, type-checked against tsconfig.json.
+    // noita/ uses a lighter ruleset below.
     files: ["**/*.ts", "*.ts"],
+    ignores: ["noita/**"],
     languageOptions: {
       parserOptions: {
         parser: tseslint.parser,
@@ -14,8 +20,13 @@ export default defineConfig([
       },
     },
   },
-  tseslint.configs.recommendedTypeChecked,
+  ...tseslint.configs.recommendedTypeChecked.map((config) => ({
+    ...config,
+    ignores: ["noita/**"],
+  })),
   {
+    files: ["**/*.ts", "*.ts"],
+    ignores: ["noita/**"],
     plugins: {
       "@stylistic": stylistic,
       import: importPlugin,
@@ -40,6 +51,27 @@ export default defineConfig([
       "@typescript-eslint/consistent-type-assertions": ["error", {
         assertionStyle: "never",
       }],
+      "no-restricted-syntax": ["error", {
+        selector: "CallExpression[callee.property.name='forEach']",
+        message: "forEach is prohibited. Use for..of or functional methods with value return.",
+      }, {
+        selector: "TSInterfaceDeclaration",
+        message: "interface is prohibited; use a type alias.",
+      }, {
+        selector: "TSDeclareFunction",
+        message: "Function overloads are prohibited; use a single signature.",
+      }, {
+        selector: "TSEmptyBodyFunctionExpression",
+        message: "Method overloads are prohibited; use a single signature.",
+      }],
     },
+  },
+  {
+    // noita: the ported sources are strictly typed, so an explicit `any` is a
+    // lint error; this is the only rule noita enforces for now.
+    files: ["noita/src/**/*.ts", "noita/scripts/**/*.ts"],
+    plugins: {"@typescript-eslint": tseslint.plugin},
+    languageOptions: {parser: tseslint.parser},
+    rules: {"@typescript-eslint/no-explicit-any": "error"},
   },
 ]);

@@ -1,0 +1,10 @@
+const TAU = Math.PI * 2;
+
+// Optional export clock. Live motion (period = 0) keeps its original formulas.
+// Complete turns close the pose AND its velocity, without reversing playback.
+export function loopAngle(frame: number, rate: number, period = 0, minimumTurns = 1) {
+  if (!period)
+    return frame * rate;
+  const turns = Math.sign(rate) * Math.max(minimumTurns, Math.round(Math.abs(rate) * period / TAU));
+  return frame / period * TAU * turns;
+}

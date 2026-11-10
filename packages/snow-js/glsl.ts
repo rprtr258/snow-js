@@ -1,15 +1,21 @@
-export type FieldType = "float" | "int" | "vec2" | "ivec2" | "vec3" | "ivec3" | "vec4" | "ivec4";
+export const VERTEX_GLSL = `
+attribute vec3 aVertexPosition;
 
-interface WindowListenerCallback {
+void main() {
+  gl_Position = vec4(aVertexPosition, 1.0);
+}
+`;
+
+type WindowListenerCallback = {
   event: string,
   listener: (event: MouseEvent) => void,
   options?: boolean | AddEventListenerOptions,
-}
+};
 
-interface GlOption {
+type GlOption = {
   renderHook: () => void,
   windowListener?: WindowListenerCallback[],
-}
+};
 
 function createShader(ctx: WebGLRenderingContext, type: GLenum, source: string): WebGLShader {
   const shader = ctx.createShader(type);
@@ -32,13 +38,8 @@ const positions = [
   -1.0,  1.0, 1.0,
 ];
 
-export class GL {
-  ctx: WebGLRenderingContext;
-  el: HTMLCanvasElement;
-
-  program: WebGLProgram;
-  vertexShader: WebGLShader;
-  fragmentShader: WebGLShader;
+type GL = {
+  ctx: WebGLRenderingContext,
   programInfo: {
     attribs: {
       vertexPosition: number,
@@ -48,144 +49,119 @@ export class GL {
       time: WebGLUniformLocation | null,
       mouse: WebGLUniformLocation | null,
     } & Record<string, WebGLUniformLocation | null>,
+  },
+  running: boolean,
+};
+
+export function createGL(
+  el: HTMLCanvasElement,
+  vertexShaderSource: string,
+  fragmentShaderSource: string,
+  options: GlOption,
+  keys: string[],
+): GL {
+  const ctx = el.getContext("webgl");
+  if (!ctx)
+    throw new Error("Unable to initialize WebGL. Your browser or machine may not support it.");
+
+  const vertexShader = createShader(ctx, ctx.VERTEX_SHADER, vertexShaderSource);
+  const fragmentShader = createShader(ctx, ctx.FRAGMENT_SHADER, fragmentShaderSource);
+
+  const program = ctx.createProgram();
+  if (program === null)
+    throw new Error(`Failed to compile WebGL program: ${ctx.getProgramInfoLog(program)}`);
+
+  ctx.attachShader(program, vertexShader);
+  ctx.attachShader(program, fragmentShader);
+  ctx.linkProgram(program);
+  ctx.useProgram(program);
+  if (ctx.getProgramParameter(program, ctx.LINK_STATUS) !== true)
+    throw new Error("Unable to initialize the shader program: " + ctx.getProgramInfoLog(program));
+
+  const programInfo: GL["programInfo"] = {
+    attribs: {
+      vertexPosition: ctx.getAttribLocation(program, "aVertexPosition"),
+    },
+    uniforms: {
+      resolution: ctx.getUniformLocation(program, "iResolution"),
+      time: ctx.getUniformLocation(program, "iTime"),
+      mouse: ctx.getUniformLocation(program, "iMouse"),
+      ...Object.fromEntries(keys.map((k) => [k, ctx.getUniformLocation(program, k)])),
+    },
   };
 
-  innerRunning = false;
+  const initBuffers = (): void => {
+    const positionBuffer = ctx.createBuffer();
+    ctx.bindBuffer(ctx.ARRAY_BUFFER, positionBuffer);
+    ctx.bufferData(
+      ctx.ARRAY_BUFFER,
+      new Float32Array(positions),
+      ctx.STATIC_DRAW,
+    );
 
-  positionBuffer!: WebGLBuffer | null;
+    const vertexPositionLocation = programInfo.attribs.vertexPosition;
+    ctx.enableVertexAttribArray(vertexPositionLocation);
+    ctx.vertexAttribPointer(vertexPositionLocation, 2, ctx.FLOAT, false, 0, 0);
+  };
 
-  listeners: WindowListenerCallback[] = [];
-  innerPxratio = 0.8;
+  const pxratio = 0.8;
+  const resize = (): void => {
+    const {innerWidth: width, innerHeight: height} = window;
 
-  renderHook: () => void;
+    el.width = width * pxratio;
+    el.height = height * pxratio;
+    ctx.viewport(0, 0, width * pxratio, height * pxratio);
 
-  constructor(
-    el: HTMLCanvasElement,
-    vertexShaderSource: string,
-    fragmentShaderSource: string,
-    options: GlOption,
-    keys: string[],
-  ) {
-    this.el = el;
+    el.style.width = width + "px";
+    el.style.height = height + "px";
+    ctx.uniform2fv(programInfo.uniforms.resolution, [width * pxratio, height * pxratio]);
 
-    const ctx = this.el.getContext("webgl");
-    if (!ctx) {
-      throw new Error("Unable to initialize WebGL. Your browser or machine may not support it.");
-    }
+    initBuffers();
+  };
 
-    this.ctx = ctx;
+  let innerRunning = false;
+  const render = (): void => {
+    if (innerRunning)
+      requestAnimationFrame(render);
 
-    // Create the shaders
-    this.vertexShader = createShader(this.ctx, this.ctx.VERTEX_SHADER, vertexShaderSource);
-    this.fragmentShader = createShader(this.ctx, this.ctx.FRAGMENT_SHADER, fragmentShaderSource);
+    options.renderHook();
+    ctx.drawArrays(ctx.TRIANGLES, 0, 6);
+  };
 
-    this.program = this.ctx.createProgram();
-    if (this.program === null) {
-      throw new Error(`Failed to compile WebGL program: ${this.ctx.getProgramInfoLog(this.program)}`);
-    }
-
-    this.ctx.attachShader(this.program, this.vertexShader);
-    this.ctx.attachShader(this.program, this.fragmentShader);
-    this.ctx.linkProgram(this.program);
-    this.ctx.useProgram(this.program);
-    if (this.ctx.getProgramParameter(this.program, this.ctx.LINK_STATUS) !== true)
-      throw new Error("Unable to initialize the shader program: " + this.ctx.getProgramInfoLog(this.program));
-
-    this.programInfo = {
-      attribs: {
-        vertexPosition: this.ctx.getAttribLocation(this.program, "aVertexPosition"),
-      },
-      uniforms: {
-        resolution: this.ctx.getUniformLocation(this.program, "iResolution"),
-        time: this.ctx.getUniformLocation(this.program, "iTime"),
-        mouse: this.ctx.getUniformLocation(this.program, "iMouse"),
-        ...Object.fromEntries(keys.map((k) => [k, this.ctx.getUniformLocation(this.program, k)])),
-      },
-    };
-
-    this.initBuffers();
-
-    this.renderHook = options.renderHook;
-
-    this.listeners.push({
+  const listeners: WindowListenerCallback[] = [
+    {
       event: "mousemove",
       listener: event => {
         const {x, y} = event;
-        this.ctx.uniform2f(this.programInfo.uniforms.mouse, x, y);
+        ctx.uniform2f(programInfo.uniforms.mouse, x, y);
       },
-    });
-    this.listeners.push({
-      event: "resize",
-      listener: () => this.resize(),
-    });
-    this.addListeners();
-    this.resize();
-  }
-
-  get pxratio() {
-    return this.innerPxratio;
-  }
-  set pxratio(value: number) {
-    if (value !== this.pxratio) {
-      this.innerPxratio = value;
-      this.resize();
-    }
-  }
-
-  set running(value) {
-    if (!this.innerRunning && value) {
-      requestAnimationFrame(() => this.render());
-    } else if (this.innerRunning && !value) {
-      this.removeListeners();
-    }
-    this.innerRunning = value;
-  }
-  get running() {
-    return this.innerRunning;
-  }
-
-  render() {
-    if (this.running)
-      requestAnimationFrame(() => this.render());
-
-    this.renderHook();
-    this.ctx.drawArrays(this.ctx.TRIANGLES, 0, 6);
-  }
-
-  initBuffers() {
-    this.positionBuffer = this.ctx.createBuffer();
-    this.ctx.bindBuffer(this.ctx.ARRAY_BUFFER, this.positionBuffer);
-    this.ctx.bufferData(
-      this.ctx.ARRAY_BUFFER,
-      new Float32Array(positions),
-      this.ctx.STATIC_DRAW,
-    );
-
-    const vertexPositionLocation = this.programInfo.attribs.vertexPosition;
-    this.ctx.enableVertexAttribArray(vertexPositionLocation);
-    this.ctx.vertexAttribPointer(vertexPositionLocation, 2, this.ctx.FLOAT, false, 0, 0);
-  }
-
-  addListeners() {
-    for (const {event, listener, options} of this.listeners)
+    },
+    {event: "resize", listener: () => resize()},
+  ];
+  const addListeners = (): void => {
+    for (const {event, listener, options} of listeners)
       window.addEventListener(event, e => listener(e as MouseEvent), options); // eslint-disable-line
-  }
-  removeListeners() {
-    for (const {event, listener, options} of this.listeners)
+  };
+  const removeListeners = (): void => {
+    for (const {event, listener, options} of listeners)
       window.removeEventListener(event, e => listener(e as MouseEvent), options);// eslint-disable-line
-  }
+  };
 
-  resize() {
-    const {innerWidth: width, innerHeight: height} = window;
+  addListeners();
+  resize();
 
-    this.el.width = width * this.pxratio;
-    this.el.height = height * this.pxratio;
-    this.ctx.viewport(0, 0, width * this.pxratio, height * this.pxratio);
-
-    this.el.style.width = width + "px";
-    this.el.style.height = height + "px";
-    this.ctx.uniform2fv(this.programInfo.uniforms.resolution, [width * this.pxratio, height * this.pxratio]);
-
-    this.initBuffers();
-  }
+  return {
+    ctx,
+    programInfo,
+    get running(): boolean {
+      return innerRunning;
+    },
+    set running(value: boolean) {
+      if (!innerRunning && value)
+        requestAnimationFrame(render);
+      else if (innerRunning && !value)
+        removeListeners();
+      innerRunning = value;
+    },
+  };
 }

@@ -1,0 +1,23 @@
+import { BLUE_NOISE_SIZE, blueNoiseRanks } from "./blue-noise-ranks";
+
+// A progressive blue-noise rank mask, remapped through the triangular inverse
+// CDF. Monotonic remapping preserves the blue-noise threshold ordering.
+// Identical Float32 samples are used by JS and WASM composition.
+const GLOW_DITHER_SIZE = BLUE_NOISE_SIZE;
+export const GLOW_DITHER_TILE = Float32Array.from(blueNoiseRanks, rank => {
+  const count = blueNoiseRanks.length;
+  const tail = Math.min(rank, count - 1 - rank);
+  const magnitude = 1 - Math.sqrt((2 * tail + 1) / count);
+  return rank < count / 2 ? -magnitude : magnitude;
+});
+
+// Stable, zero-centered and shared by RGB. Never fed into glow history.
+function glowDither(x: number, y: number) {
+  return GLOW_DITHER_TILE[(y & (GLOW_DITHER_SIZE - 1)) * GLOW_DITHER_SIZE + (x & (GLOW_DITHER_SIZE - 1))];
+}
+
+export function glowDitherField(width: number, height: number) {
+  const noise = new Float32Array(width * height);
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) noise[y * width + x] = glowDither(x, y);
+  return noise;
+}

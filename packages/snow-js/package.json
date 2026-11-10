@@ -1,23 +1,55 @@
 {
-  "name": "snow-js",
+  "name": "@rprtr258/snow-js",
+  "version": "0.1.0",
+  "description": "Browser visual effects as self-contained definitions with typed option schemas",
+  "license": "MIT",
+  "homepage": "https://rprtr258.github.io/snow-js/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rprtr258/snow-js.git",
+    "directory": "packages/snow-js"
+  },
+  "keywords": [
+    "snow",
+    "effects",
+    "webgl",
+    "canvas",
+    "particles",
+    "shaders",
+    "browser"
+  ],
   "module": "index.ts",
   "type": "module",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "files": [
+    "index.ts",
+    "effect.ts",
+    "registry.ts",
+    "glsl.ts",
+    "creation",
+    "glsl-effect.ts",
+    "snow",
+    "noita",
+    "!noita/**/*.test.ts",
+    "!noita/**/__snapshots__",
+    "!noita/scripts"
+  ],
   "scripts": {
-    "dev:website": "bun run dev --filter=./website",
-    "lint": "eslint '**/*.{ts,json}' && tsc -p tsconfig.json",
-    "lint:fix": "eslint '**/*.{ts,json}' --fix"
+    "lint": "eslint '**/*.{ts,json}' && knip",
+    "typecheck": "bun check",
+    "lint:fix": "eslint '**/*.{ts,json}' --fix",
+    "test": "bun test"
   },
   "devDependencies": {
-    "@types/bun": "latest",
-    "vite": "^7.3.0"
-  },
-  "peerDependencies": {
-    "typescript": "^5",
-    "@eslint/js": "^9.39.2",
     "@stylistic/eslint-plugin": "^5.6.1",
+    "@types/bun": "latest",
     "eslint": "^9.39.2",
     "eslint-plugin-import": "^2.32.0",
     "jiti": "^2.6.1",
-    "typescript-eslint": "^8.52.0"
+    "knip": "^6.44.2",
+    "typescript-eslint": "^8.52.0",
+    "wabt": "1.0.39"
   }
 }

@@ -1,28 +1,35 @@
 {
   "compilerOptions": {
     // Environment setup & latest features
-    "lib": ["DOM", "ESNext"],
+    "lib": ["DOM", "DOM.Iterable", "ESNext", "WebWorker"],
     "target": "ESNext",
     "module": "ESNext",
     "moduleDetection": "force",
     "allowJs": false,
     "alwaysStrict": true,
+    "types": ["bun"],
+    "resolveJsonModule": true,
 
     // Bundler mode
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
+    // false so esbuild/vite (which resolve this tsconfig for noita/ files too)
+    // elides type-only imports; noita's ported sources import types unmarked.
+    "verbatimModuleSyntax": false,
     "noEmit": true,
 
     // Best practices
     "strict": true,
     "skipLibCheck": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedIndexedAccess": true,
+    "noUncheckedIndexedAccess": false,
 
     // Some stricter flags (disabled by default)
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "noPropertyAccessFromIndexSignature": false
-  }
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noPropertyAccessFromIndexSignature": true
+  },
+  // Build output only; noita/src and noita/scripts are
+  // type-checked here.
+  "exclude": ["noita/dist"]
 }
