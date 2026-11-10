@@ -5,8 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>snow-js</title>
-  <link rel="icon"
-    href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>❄️</text></svg>">
+  <link rel="icon" href="./favicon.svg">
   <link rel="stylesheet" href="/index.css">
   <style>
     body {
@@ -69,7 +68,7 @@
       color: hsla(0, 0%, 70%, 1);
     }
 
-    .snow-container {
+    .effect-container {
       position: fixed;
       left: 0;
       top: 0;
@@ -79,6 +78,12 @@
       background-size: cover;
       background-position: 50% 50%;
       background-repeat: no-repeat;
+    }
+    /* Snow and dust canvases stack in the same fixed container. */
+    .effect-container canvas {
+      position: absolute;
+      left: 0;
+      top: 0;
     }
 
     :root {
@@ -105,19 +110,19 @@
       --tp-monitor-foreground-color: hsla(0, 0%, 48%, 1);
     }
   </style>
-  <script type="module" crossorigin src="./assets/index-Cc45tAX1.js"></script>
+  <script type="module" crossorigin src="./assets/index-3NVb3Wqh.js"></script>
 </head>
 
 <body>
   <div class="container">
     <div>❄️</div>
     <h1>snow-js</h1>
-    <h2>A simple snow library!</h2>
+    <h2>Snow — and whatever else we dream up</h2>
     <a href="https://github.com/rprtr258/snow-js/" target="_blank">
       <span class="label">Visit on GitHub</span>
     </a>
   </div>
-  <div class="snow-container"></div>
+  <div class="effect-container"></div>
 </body>
 
 </html>
