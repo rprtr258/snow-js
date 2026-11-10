@@ -20,7 +20,7 @@ jobs:
           bun-version: latest
 
       - name: Install deps
-        run: cd ./packages/website && bun install
+        run: bun install
 
       - name: Build
         run: |

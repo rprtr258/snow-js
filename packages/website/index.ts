@@ -33,8 +33,7 @@ function applyBackgroundImage(): void {
   effectContainer.style.backgroundImage = layers.join(", ");
 }
 
-/** active effect */
-const effectState = {effect: "snow"};
+const activeEffect = {effect: "snow"};
 let current: {instance: EffectInstance} | null = null;
 let optionsFolder: FolderApi | null = null;
 let currentForm: (() => void) | null = null;
@@ -104,13 +103,13 @@ snowJs.addBinding(cardConfig, "show", {label: "show card"}).on("change", ({value
   mainContainer.style.display = value ? "block" : "none";
 });
 
-snowJs.addBinding(effectState, "effect", {
+snowJs.addBinding(activeEffect, "effect", {
   label: "effect",
   options: Object.fromEntries(Object.entries(EFFECTS).map(([key, def]) => [def.label, key])),
 }).on("change", ({value}) => {
   activate(value);
 });
-activate(effectState.effect);
+activate(activeEffect.effect);
 
 /** fullscreen */
 declare global {
