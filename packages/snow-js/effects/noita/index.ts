@@ -25,25 +25,27 @@ function catalogEntries(group: string): SelectEntry[] {
     .map((meta) => ({value: meta.key, label: meta.label}));
 }
 
-function gameGroups(): SelectGroup[] {
-  return [
-    {
-      label: "Portals",
-      entries: Object.entries(PORTAL_EFFECTS).map(([key, e]) => ({value: key, label: e.label})),
-    },
-    {label: CATALOG_GROUP_LABELS["objects"]!, entries: catalogEntries("objects")},
-    {label: CATALOG_GROUP_LABELS["images"]!, entries: catalogEntries("images")},
-  ];
-}
+const gameGroups: SelectGroup[] = [
+  {
+    label: "Portals",
+    entries: Object.entries(PORTAL_EFFECTS).map(([key, e]) => ({value: key, label: e.label})),
+  },
+  {
+    label: CATALOG_GROUP_LABELS["objects"]!,
+    entries: catalogEntries("objects"),
+  },
+  {
+    label: CATALOG_GROUP_LABELS["images"]!,
+    entries: catalogEntries("images"),
+  },
+];
 
-function mathGroups(): SelectGroup[] {
-  return Object.entries(MATH_GROUPS).map(([key, label]) => ({
-    label,
-    entries: Object.entries(MATH_EFFECTS)
-      .filter(([, e]) => e.group === key)
-      .map(([figureKey, e]) => ({value: figureKey, label: e.label})),
-  }));
-}
+const mathGroups: SelectGroup[] = Object.entries(MATH_GROUPS).map(([key, label]) => ({
+  label,
+  entries: Object.entries(MATH_EFFECTS)
+    .filter(([, e]) => e.group === key)
+    .map(([figureKey, e]) => ({value: figureKey, label: e.label})),
+}));
 
 const options = {
   collection: select<NoitaCollection>("game", {
@@ -55,8 +57,7 @@ const options = {
   }),
   effect: select<string>("meditation", {
     label: "effect",
-    entries: (values: OptionValues): SelectGroup[] =>
-      values["collection"] === "math" ? mathGroups() : gameGroups(),
+    entries: (values: OptionValues): SelectGroup[] => values["collection"] === "math" ? mathGroups : gameGroups,
   }),
   speed: num(1, {label: "speed", min: 0.25, max: 2}),
   zoom: num(1, {label: "zoom", min: 1, max: 10, step: 1}),

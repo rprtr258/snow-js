@@ -303,10 +303,13 @@ function lattice(
     }
   return { vertices, edges, scale, speed: 0.55 };
 }
-function sierpinski() {
-  const vertices: number[][] = [],
-    edges: Edge[] = [],
-    midpoint = (a: number[], b: number[]) => a.map((v, i) => (v + b[i]) / 2);
+
+const sierpinski = (() => {
+  const vertices: number[][] = [];
+  const edges: Edge[] = [];
+  function midpoint(a: number[], b: number[]) {
+    return a.map((v, i) => (v + b[i]) / 2);
+  }
   function triangle(a: number[], b: number[], c: number[], depth: number) {
     if (!depth) {
       const i = vertices.length;
@@ -314,17 +317,18 @@ function sierpinski() {
       edges.push([i, i + 1], [i + 1, i + 2], [i + 2, i]);
       return;
     }
-    const ab = midpoint(a, b),
-      bc = midpoint(b, c),
-      ca = midpoint(c, a);
+    const ab = midpoint(a, b);
+    const bc = midpoint(b, c);
+    const ca = midpoint(c, a);
     triangle(a, ab, ca, depth - 1);
     triangle(ab, b, bc, depth - 1);
     triangle(ca, bc, c, depth - 1);
   }
   triangle([0, -1], [Math.sqrt(3) / 2, 0.5], [-Math.sqrt(3) / 2, 0.5], 3);
   return { vertices, edges, scale: 90, planar: true };
-}
-function koch() {
+})();
+
+const koch = (() => {
   let points: Point2[] = [
     [0, -1],
     [Math.sqrt(3) / 2, 0.5],
@@ -348,17 +352,14 @@ function koch() {
     points = next;
   }
   return { ...polyline(points, 88), planar: true };
-}
-function hilbert() {
-  const size = 16,
-    points: Point2[] = [];
+})();
+
+const hilbert = (() => {
+  const size = 16, points: Point2[] = [];
   for (let index = 0; index < size * size; index++) {
-    let x = 0,
-      y = 0,
-      bits = index;
+    let x = 0, y = 0, bits = index;
     for (let side = 1; side < size; side *= 2) {
-      const rx = (bits >> 1) & 1,
-        ry = (bits ^ rx) & 1;
+      const rx = (bits >> 1) & 1, ry = (bits ^ rx) & 1;
       if (!ry) {
         if (rx) {
           x = side - 1 - x;
@@ -373,7 +374,8 @@ function hilbert() {
     points.push([(2 * x) / (size - 1) - 1, (2 * y) / (size - 1) - 1]);
   }
   return { ...polyline(points, 76, false), planar: true };
-}
+})();
+
 const PHI = (1 + Math.sqrt(5)) / 2;
 const meshes: Record<string, Mesh> = {
   math_tetrahedron: solid(
@@ -465,9 +467,9 @@ const meshes: Record<string, Mesh> = {
     ),
     planar: true,
   },
-  math_sierpinski: sierpinski(),
-  math_koch: koch(),
-  math_hilbert: hilbert(),
+  math_sierpinski: sierpinski,
+  math_koch: koch,
+  math_hilbert: hilbert,
 };
 
 export function figureSegments(key: string, frame: number, period = 0): Segments {

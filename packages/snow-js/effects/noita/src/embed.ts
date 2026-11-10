@@ -258,7 +258,7 @@ export class Noita {
         loadCatalog(),
         fetchBin(),
         loadEmbedRasterModule(),
-        compileRenderKernel(),
+        compileRenderKernel,
       ]);
       if (this.disposed) return;
       this.catalog = catalog;

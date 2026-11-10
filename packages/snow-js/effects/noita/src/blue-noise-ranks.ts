@@ -458,9 +458,9 @@ const encoded =
   "PBQiBRE5BxJ5PC0xqg/PGm4ItB+EEXYZryztAy8Y+QrwN7IEej1jFGs22yDhMbY6qQQnLl81YhkoBEUMVCYsEawExyrLFYck" +
   "JDdzCyUicRziL+kq+T+UBGMa+gnYLiEVCj/gJe4J8RUGI2gaXTCaNKkVJj5JDTAwdiZYPwoFMxw6LJoPzz46JN0UYTtYKIk2" +
   "VgZWD9E03SA=";
-export function blueNoiseRanks() {
+export const blueNoiseRanks = (() => {
   const bytes = atob(encoded), ranks = new Uint16Array(bytes.length / 2);
   for (let i = 0; i < ranks.length; i++)
     ranks[i] = bytes.charCodeAt(i * 2) | (bytes.charCodeAt(i * 2 + 1) << 8);
   return ranks;
-}
+})();

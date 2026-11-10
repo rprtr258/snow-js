@@ -63,7 +63,7 @@ const NOISE_TABLE_BYTES = 800;
 
 // Compiles the embedded kernel binary. Returns null where WebAssembly (or its
 // base64 decode) is unavailable; every caller must fall back to the JS blend.
-export function compileRenderKernel(): WebAssembly.Module | null {
+export const compileRenderKernel: WebAssembly.Module | null = (() => {
   try {
     const base64 = atob(RENDER_KERNEL_WASM);
     const bytes = new Uint8Array(base64.length);
@@ -72,7 +72,7 @@ export function compileRenderKernel(): WebAssembly.Module | null {
   } catch {
     return null;
   }
-}
+})();
 
 export class RenderKernel {
   declare memory: WebAssembly.Memory;

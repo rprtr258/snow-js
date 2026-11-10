@@ -100,23 +100,21 @@ function bitsOf(values: ArrayLike<number>): string {
 
 // The fullscreen replay at density 1: same emitters, lifetimes and fast
 // branches, with a pool small enough for a few hundred lockstep steps.
-function meditationReplay() {
-  return {
-    worldSeed: 1,
-    x: 0,
-    y: 0,
-    startFrame: 0,
-    effect: "meditation",
-    mathTrailScale: 3,
-    minTrailLifetime: 3.5,
-    ambientRing: false,
-    density: 1,
-    retainInvisible: false,
-    fastParticles: true,
-    cullInvisible: true,
-    particleMirror: true,
-  };
-}
+const meditationReplay = {
+  worldSeed: 1,
+  x: 0,
+  y: 0,
+  startFrame: 0,
+  effect: "meditation",
+  mathTrailScale: 3,
+  minTrailLifetime: 3.5,
+  ambientRing: false,
+  density: 1,
+  retainInvisible: false,
+  fastParticles: true,
+  cullInvisible: true,
+  particleMirror: true,
+};
 
 // Every field the integration touches, keyed bit-exactly (Object.is keeps -0
 // distinct from 0; flags and meta round-trip through their string form).
@@ -139,42 +137,35 @@ function particleKey(p: Particle): string {
 }
 
 function poolKey(sim: PortalSimulation): string {
-  let key = `${sim.particles.length}:${sim.totalEmitted}:${sim.dropped}:${sim.visibleCount}|`;
-  for (const p of sim.particles) key += particleKey(p);
-  return key;
+  return `${sim.particles.length}:${sim.totalEmitted}:${sim.dropped}:${sim.visibleCount}|` + sim.particles.map(particleKey);
 }
 
-test(
-  "fast-path sims stay bit-identical with the wasm batch wired",
-  () => {
-    const replay = meditationReplay();
-    const reference = new PortalSimulation({ ...replay });
-    const batched = new PortalSimulation({ ...replay });
-    batched.airflowBatch = (ax, ay, n, time) => kernel.noiseAngles(ax, ay, n, time);
+test("fast-path sims stay bit-identical with the wasm batch wired", () => {
+  const reference = new PortalSimulation({ ...meditationReplay });
+  const batched = new PortalSimulation({ ...meditationReplay });
+  batched.airflowBatch = (ax, ay, n, time) => kernel.noiseAngles(ax, ay, n, time);
 
-    for (let step = 1; step <= 200; step++) {
-      reference.step();
-      batched.step();
-      if (step % 100 === 0) {
-        const refKey = poolKey(reference);
-        expect(refKey).toBe(poolKey(batched));
-        expect(reference.particles.length).toBeGreaterThan(0);
-      }
+  for (let step = 1; step <= 200; step++) {
+    reference.step();
+    batched.step();
+    if (step % 100 === 0) {
+      const refKey = poolKey(reference);
+      expect(refKey).toBe(poolKey(batched));
+      expect(reference.particles.length).toBeGreaterThan(0);
     }
-    // The reference replay must be reproducible across runs (the comparison
-    // above is only meaningful if the baseline itself is stable).
-    const again = new PortalSimulation({ ...replay });
-    for (let step = 0; step < 200; step++) again.step();
-    expect(poolKey(again)).toBe(poolKey(reference));
+  }
+  // The reference replay must be reproducible across runs (the comparison
+  // above is only meaningful if the baseline itself is stable).
+  const again = new PortalSimulation({ ...meditationReplay });
+  for (let step = 0; step < 200; step++) again.step();
+  expect(poolKey(again)).toBe(poolKey(reference));
 
-    // The batch view is transient: a later call with a different size must not
-    // be poisoned by the previous one's memory layout.
-    const rng = new NoitaRandom(7);
-    const probe = new Float64Array(4096);
-    for (let i = 0; i < probe.length; i++) probe[i] = rng.float(-500, 500);
-    const out = kernel.noiseAngles(probe, probe, probe.length, 1);
-    for (let i = 0; i < probe.length; i++)
-      expect(out[i]).toBe(simplex3(probe[i]!, probe[i]!, 1));
-  },
-  30000,
-);
+  // The batch view is transient: a later call with a different size must not
+  // be poisoned by the previous one's memory layout.
+  const rng = new NoitaRandom(7);
+  const probe = new Float64Array(4096);
+  for (let i = 0; i < probe.length; i++) probe[i] = rng.float(-500, 500);
+  const out = kernel.noiseAngles(probe, probe, probe.length, 1);
+  for (let i = 0; i < probe.length; i++)
+    expect(out[i]).toBe(simplex3(probe[i]!, probe[i]!, 1));
+}, 30000);
