@@ -2,7 +2,7 @@
 // https://www.shadertoy.com/view/ldsGDn). Own shader module, consumed by the
 // snow effect's "snowfall" preset; not a standalone registry entry.
 import {defineEffect, num, type InferOptions} from "../../effect.ts";
-import {createShaderEffect, type UniformMap} from "../snow-runner.ts";
+import {createGlslEffect, type UniformMap} from "../glsl-effect.ts";
 
 const FRAGMENT_GLSL = `
 precision highp float;
@@ -67,7 +67,7 @@ function toUniforms(values: SnowfallValues): UniformMap {
 export default defineEffect({
   label: "Snowfall",
   options,
-  create: (el, values) => createShaderEffect(el, {
+  create: (el, values) => createGlslEffect(el, {
     fragment: FRAGMENT_GLSL,
     values,
     toUniforms,

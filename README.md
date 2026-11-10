@@ -61,7 +61,7 @@ bun run dev:website   # website with the tweakpane playground
 
    ```ts
    import {defineEffect, num} from "../../effect.ts";
-   import {createShaderEffect} from "../snow-runner.ts";
+   import {createShaderEffect} from "../glsl-effect.ts";
 
    const options = {
      speed: num(10, {label: "speed", min: 0, max: 20}),
@@ -97,7 +97,7 @@ packages/snow-js/
   registry.ts          EFFECTS object, createEffect/getEffect
   glsl.ts              WebGL quad renderer (shader effects)
   effects/
-    snow-runner.ts     shared lifecycle for fragment-shader effects
+    glsl-effect.ts    shared lifecycle for fragment-shader effects
     snow/              "Snow" — preset "snow": flat snow
                        (shadertoy 4sX3z2); preset "snowfall": layered
                        blizzard (shadertoy ldsGDn)

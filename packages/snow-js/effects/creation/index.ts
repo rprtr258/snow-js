@@ -1,6 +1,6 @@
 // Psychedelic tunnel (http://www.pouet.net/prod.php?which=57245).
 import {defineEffect, num} from "../../effect.ts";
-import {createShaderEffect} from "../snow-runner.ts";
+import {createGlslEffect} from "../glsl-effect.ts";
 
 const FRAGMENT_GLSL = `
 precision highp float;
@@ -40,7 +40,7 @@ const options = {
 export default defineEffect({
   label: "Creation",
   options,
-  create: (el, values) => createShaderEffect(el, {
+  create: (el, values) => createGlslEffect(el, {
     fragment: FRAGMENT_GLSL,
     values,
     toUniforms: () => ({}),

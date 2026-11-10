@@ -4,7 +4,7 @@
 // shader runs; option visibility follows it.
 import {bool, defineEffect, num, select, type EffectInstance, type InferOptions, type OptionValues} from "../../effect.ts";
 import snowfall, {options as snowfallOptions} from "./snowfall.ts";
-import {createShaderEffect, type UniformMap} from "../snow-runner.ts";
+import {createGlslEffect, type UniformMap} from "../glsl-effect.ts";
 
 const FRAGMENT_GLSL = `
 precision highp float;
@@ -20,7 +20,6 @@ uniform float opacity;
 
 const int SNOW_LAYERS = 8;
 
-// Construct and return a vec2 with cos(angle) and sin(angle)
 vec2 sincos(float angle) {
   return vec2(cos(angle), sin(angle));
 }
@@ -115,61 +114,53 @@ function toUniforms(values: SnowValues): UniformMap {
 }
 
 function createSnowShader(el: Element, values: SnowValues): EffectInstance {
-  return createShaderEffect(el, {
+  return createGlslEffect(el, {
     fragment: FRAGMENT_GLSL,
     values,
     toUniforms,
-    speedOf: (v) => v.speed,
+    speedOf: v => v.speed,
   });
 }
 
 // Each preset runs its own shader: this wrapper swaps the underlying shader
 // effect when the preset option changes, keeping all edited values.
-class PresetSnowEffect implements EffectInstance {
-  private readonly el: Element;
-  private values: SnowValues;
-  private inner: EffectInstance;
-  private started = false;
+function create(el: Element, values: SnowValues): EffectInstance {
+  const instantiate = (v: SnowValues): EffectInstance =>
+    v.preset === "snowfall" ? snowfall.create(el, v) : createSnowShader(el, v);
 
-  constructor(el: Element, values: SnowValues) {
-    this.el = el;
-    this.values = values;
-    this.inner = this.instantiate(values);
-  }
+  let current = values;
+  let inner = instantiate(current);
+  let started = false;
 
-  private instantiate(values: SnowValues): EffectInstance {
-    if (values.preset === "snowfall")
-      return snowfall.create(this.el, values);
-    return createSnowShader(this.el, values);
-  }
-
-  start(): void {
-    this.started = true;
-    this.inner.start();
-  }
-  stop(): void {
-    this.started = false;
-    this.inner.stop();
-  }
-  update(options: Partial<OptionValues>): void {
-    const previousPreset = this.values.preset;
-    this.values = {...this.values, ...options};
-    if (this.values.preset === previousPreset) {
-      this.inner.update(options);
-      return;
-    }
-    this.inner.unmount();
-    this.inner = this.instantiate(this.values);
-    if (this.started)
-      this.inner.start();
-  }
-  unmount(): void {
-    this.inner.unmount();
-  }
+  return {
+    start(): void {
+      started = true;
+      inner.start();
+    },
+    stop(): void {
+      started = false;
+      inner.stop();
+    },
+    update(options: Partial<OptionValues>): void {
+      const previousPreset = current.preset;
+      current = {...current, ...options};
+      if (current.preset === previousPreset) {
+        inner.update(options);
+        return;
+      }
+      inner.unmount();
+      inner = instantiate(current);
+      if (started)
+        inner.start();
+    },
+    unmount(): void {
+      inner.unmount();
+    },
+  };
 }
 
 export default defineEffect({
   label: "Snow",
   options,
-  create: (el, values) => new PresetSnowEffect(el, values),
+  create,
 });
