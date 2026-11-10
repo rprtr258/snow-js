@@ -29,18 +29,9 @@ const SPARK = Object.freeze({
   glow: 60,
 });
 export const EFFECTS = Object.freeze({
-  holy_mountain: Object.freeze({
-    label: "Holy Mountain portal",
-    source: "teleport_liquid_powered.xml",
-  }),
-  meditation: Object.freeze({
-    label: "Meditation cube portal",
-    source: "teleport_meditation_cube_return.xml",
-  }),
-  eye_room: Object.freeze({
-    label: "Hiisi Base eye-room portal",
-    source: "teleport_hourglass_return.xml",
-  }),
+  holy_mountain: "Holy Mountain portal",
+  meditation: "Meditation cube portal",
+  eye_room: "Hiisi Base eye-room portal",
 });
 
 // 0x00fdf530 (int16[256]); 0x00872560, the game's 3D simplex noise.
@@ -326,9 +317,10 @@ const SIN_LUT_MASK = SIN_LUT_STEPS - 1;
 const SIN_LUT_QUARTER = SIN_LUT_STEPS / 4;
 const SIN_LUT_TO_INDEX = SIN_LUT_STEPS / (2 * Math.PI);
 const SIN_LUT_BIAS = 0x40000000; // 2³⁰: keeps the masked ToInt32 flooring
-const SIN_LUT = new Float64Array(SIN_LUT_STEPS + SIN_LUT_QUARTER + 1);
-for (let i = 0; i < SIN_LUT.length; i++)
-  SIN_LUT[i] = Math.sin((i * 2 * Math.PI) / SIN_LUT_STEPS);
+const SIN_LUT = Float64Array.from(
+  { length: SIN_LUT_STEPS + SIN_LUT_QUARTER + 1 },
+  (_, i) => Math.sin((i * 2 * Math.PI) / SIN_LUT_STEPS),
+);
 
 // Float64 twin of stepParticle for the opt-in fastParticles path
 // (SimulationOptions): same branch structure and field updates — with every

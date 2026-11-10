@@ -6,6 +6,7 @@ import { ViewerRuntime } from "./viewer-runtime";
 import { EFFECTS } from "./portal-physics";
 import { MATH_EFFECTS } from "./math-figures";
 import { MATH_TRAIL_SCALE } from "./math-settings";
+import { CATALOG } from "./catalog";
 import { compileRenderKernel } from "./render-kernel";
 import { fullscreenView, PREVIEW_HEIGHT, RESOLUTION_SCALE } from "./render-resolution";
 import { Catalog, RawOptions, SimulationOptions } from "./types";
@@ -77,20 +78,8 @@ const defaults: NoitaOptions = {
   y: 0,
 };
 
-// Catalog metadata (effects.json), shared by every consumer; the effect data
-// (effects.bin) is fetched per viewer because the runtime takes ownership of it.
-let catalogPromise: Promise<Catalog> | null = null;
-function loadCatalog(): Promise<Catalog> {
-  catalogPromise ??= (async () => {
-    const response = await fetch(
-      new URL("../static/assets/effects.json", import.meta.url),
-    );
-    if (!response.ok)
-      throw new Error("noita: effect assets could not be loaded");
-    return await response.json() as Catalog;
-  })();
-  return catalogPromise;
-}
+// The effect data (effects.bin) is fetched per viewer because the runtime
+// takes ownership of it.
 async function fetchBin(): Promise<ArrayBuffer> {
   const response = await fetch(
     new URL("../static/assets/effects.bin", import.meta.url),
@@ -254,22 +243,20 @@ export class Noita {
 
   private async init() {
     try {
-      const [catalog, bin, kernelModule, renderKernelModule] = await Promise.all([
-        loadCatalog(),
+      const [bin, kernelModule] = await Promise.all([
         fetchBin(),
         loadEmbedRasterModule(),
-        compileRenderKernel,
       ]);
       if (this.disposed) return;
-      this.catalog = catalog;
+      this.catalog = CATALOG;
       const message = this.view();
       this.inline = new ViewerRuntime(
-        catalog,
+        CATALOG,
         bin,
         message.width!,
         message.height!,
         kernelModule,
-        {scale: message.scale!, renderKernelModule},
+        {scale: message.scale!, renderKernelModule: compileRenderKernel},
       );
       this.inline.restart(this.replay(), this.revision);
       const result = this.inline.frame({

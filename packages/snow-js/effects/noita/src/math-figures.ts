@@ -2,6 +2,7 @@
 // The impossible forms are 2D optical projections, not claims of realizable solids.
 import { loopAngle } from "./loop-motion";
 import { Edge, Point2, Segment, Segments } from "./types";
+
 type Mesh = {
   vertices: number[][];
   edges: Edge[];
@@ -9,7 +10,10 @@ type Mesh = {
   speed?: number;
   planar?: boolean;
 };
+
 const TAU = Math.PI * 2;
+const PHI = (1 + Math.sqrt(5)) / 2;
+
 export const MATH_GROUPS = Object.freeze({
   illusions: "Impossible / ambiguous projections",
   polyhedra: "Polyhedra & 4D",
@@ -18,30 +22,27 @@ export const MATH_GROUPS = Object.freeze({
   curves: "Curves",
   fractals: "Fractals",
 });
+
 export const MATH_EFFECTS = Object.freeze({
   math_penrose: {
     label: "Penrose triangle",
     group: "illusions",
-    description:
-      "A cyclic three-beam optical illusion, traced in purple sparks.",
+    description: "A cyclic three-beam optical illusion, traced in purple sparks.",
   },
   math_blivet: {
     label: "Impossible trident",
     group: "illusions",
-    description:
-      "A blivet-style line drawing: three round ends merge into two incompatible flat-sided branches.",
+    description: "A blivet-style line drawing: three round ends merge into two incompatible flat-sided branches.",
   },
   math_necker: {
     label: "Necker cube",
     group: "illusions",
-    description:
-      "An ambiguous wireframe cube: either face can appear to be in front.",
+    description: "An ambiguous wireframe cube: either face can appear to be in front.",
   },
   math_tesseract: {
     label: "Rotating tesseract",
     group: "polyhedra",
-    description:
-      "A 4D hypercube rotated in XW and YZ, projected into three dimensions.",
+    description: "A 4D hypercube rotated in XW and YZ, projected into three dimensions.",
   },
   math_trefoil: {
     label: "Trefoil knot",
@@ -56,14 +57,12 @@ export const MATH_EFFECTS = Object.freeze({
   math_mobius: {
     label: "Möbius strip",
     group: "surfaces",
-    description:
-      "A one-sided strip with one half-twist, drawn as a wire lattice.",
+    description: "A one-sided strip with one half-twist, drawn as a wire lattice.",
   },
   math_tetrahedron: {
     label: "Tetrahedron",
     group: "polyhedra",
-    description:
-      "Four triangular faces and six edges: the simplest Platonic solid.",
+    description: "Four triangular faces and six edges: the simplest Platonic solid.",
   },
   math_octahedron: {
     label: "Octahedron",
@@ -83,76 +82,65 @@ export const MATH_EFFECTS = Object.freeze({
   math_figure_eight: {
     label: "Figure-eight knot",
     group: "knots",
-    description:
-      "The four-crossing knot, a single closed curve turning in three dimensions.",
+    description: "The four-crossing knot, a single closed curve turning in three dimensions.",
   },
   math_cinquefoil: {
     label: "Cinquefoil knot",
     group: "knots",
-    description:
-      "The five-crossing (2,5) torus knot, woven into one continuous loop.",
+    description: "The five-crossing (2,5) torus knot, woven into one continuous loop.",
   },
   math_torus_knot: {
     label: "(3,4) torus knot",
     group: "knots",
-    description:
-      "A single closed strand with winding numbers (3,4), forming an eight-crossing torus knot.",
+    description: "A single closed strand with winding numbers (3,4), forming an eight-crossing torus knot.",
   },
   math_torus: {
     label: "Torus lattice",
     group: "surfaces",
-    description:
-      "A rotating doughnut surface outlined by intersecting meridians and parallels.",
+    description: "A rotating doughnut surface outlined by intersecting meridians and parallels.",
   },
   math_sphere: {
     label: "Spherical lattice",
     group: "surfaces",
-    description:
-      "Latitude circles and pole-to-pole meridians reveal a rotating sphere.",
+    description: "Latitude circles and pole-to-pole meridians reveal a rotating sphere.",
   },
   math_klein: {
     label: "Klein bottle",
     group: "surfaces",
-    description:
-      "A figure-eight immersion of the closed, one-sided surface; it must self-intersect in 3D.",
+    description: "A figure-eight immersion of the closed, one-sided surface; it must self-intersect in 3D.",
   },
   math_lissajous: {
     label: "3D Lissajous curve",
     group: "curves",
-    description:
-      "Three sine waves with frequencies 3:4:5 weave a spatial curve.",
+    description: "Three sine waves with frequencies 3:4:5 weave a spatial curve.",
   },
   math_viviani: {
     label: "Viviani’s curve",
     group: "curves",
-    description:
-      "A spatial figure-eight formed where a sphere meets a tangent cylinder.",
+    description: "A spatial figure-eight formed where a sphere meets a tangent cylinder.",
   },
   math_rose: {
     label: "Seven-petal rose",
     group: "curves",
-    description:
-      "The polar curve r = cos(7θ), traced through seven symmetric petals.",
+    description: "The polar curve r = cos(7θ), traced through seven symmetric petals.",
   },
   math_sierpinski: {
     label: "Sierpiński triangle",
     group: "fractals",
-    description:
-      "Three recursive subdivisions leave twenty-seven little triangles and nested gaps.",
+    description: "Three recursive subdivisions leave twenty-seven little triangles and nested gaps.",
   },
   math_koch: {
     label: "Koch snowflake",
     group: "fractals",
-    description:
-      "Three rounds of equilateral bumps turn a triangle into a 192-edge snowflake.",
+    description: "Three rounds of equilateral bumps turn a triangle into a 192-edge snowflake.",
   },
   math_hilbert: {
     label: "Hilbert curve",
     group: "fractals",
-    description:
-      "An order-four approximation of the space-filling curve: one unbroken 16 × 16 path.",
+    description: "An order-four approximation of the space-filling curve: one unbroken 16 × 16 path.",
   },
 });
+
 function rotate(p: number[], t: number, period = 0) {
   // Begin at an oblique view (not overlapping front/back faces), then turn
   // around multiple axes so rings, knots and lattices reveal their depth.
@@ -170,10 +158,12 @@ function rotate(p: number[], t: number, period = 0) {
     y = p[1] * cb - z * sb;
   return [x * cr - y * sr, x * sr + y * cr, z * cb + p[1] * sb];
 }
+
 function projected(p: number[], t: number, scale = 55, period = 0): Point2 {
   const [x, y] = rotate(p, t, period);
   return [x * scale, y * scale];
 }
+
 function wire(
   vertices: number[][],
   edges: Edge[],
@@ -184,9 +174,11 @@ function wire(
   const v = vertices.map((p) => projected(p, t, scale, period));
   return edges.map(([a, b]): Segment => [v[a], v[b]]);
 }
+
 function loop(points: Point2[]): Segments {
   return points.map((p, i): Segment => [p, points[(i + 1) % points.length]]);
 }
+
 function turnPlanar(
   segments: Segments,
   frame: number,
@@ -228,6 +220,7 @@ function polyline(vertices: number[][], scale: number, closed = true): Mesh {
     scale,
   };
 }
+
 function curve(
   count: number,
   point: (t: number) => number[],
@@ -239,6 +232,7 @@ function curve(
     scale,
   );
 }
+
 function solid(vertices: number[][], scale: number): Mesh {
   const pairs: {edge: Edge; distance: number}[] = [];
   let shortest = Infinity;
@@ -258,22 +252,25 @@ function solid(vertices: number[][], scale: number): Mesh {
     scale,
   };
 }
+
 function cyclicVertices(a: number, b: number) {
   const vertices = [];
   for (const x of [-a, a])
     for (const y of [-b, b]) vertices.push([0, x, y], [x, y, 0], [y, 0, x]);
   return vertices;
 }
+
 function torusKnot(p: number, q: number, count: number) {
   return curve(
     count,
-    (t) => {
+    t => {
       const r = 2 + 0.7 * Math.cos(q * t);
       return [r * Math.cos(p * t), r * Math.sin(p * t), 0.7 * Math.sin(q * t)];
     },
     30,
   );
 }
+
 function lattice(
   point: (u: number, v: number) => number[],
   scale: number,
@@ -376,7 +373,6 @@ const hilbert = (() => {
   return { ...polyline(points, 76, false), planar: true };
 })();
 
-const PHI = (1 + Math.sqrt(5)) / 2;
 const meshes: Record<string, Mesh> = {
   math_tetrahedron: solid(
     [
@@ -473,221 +469,174 @@ const meshes: Record<string, Mesh> = {
 };
 
 export function figureSegments(key: string, frame: number, period = 0): Segments {
-  if (key === "math_penrose") {
-    // Three nested cycles with cyclic corner joins; only rotate the 2D illusion.
-    const outer: Point2[] = [
-        [0, -83],
-        [84, 62],
-        [-84, 62],
-      ],
-      inner: Point2[] = [
-        [0, -31],
-        [38, 35],
-        [-38, 35],
-      ];
-    const middle: Point2[] = [
-      [0, -64],
-      [68, 53],
-      [-68, 53],
-    ];
-    const segments: Segments = [...loop(outer), ...loop(inner)];
-    for (let i = 0; i < 3; i++) {
-      const j = (i + 1) % 3;
-      segments.push(
-        [outer[i], middle[i]],
-        [middle[i], inner[j]],
-        [middle[i], middle[j]],
-      );
-    }
-    return turnPlanar(segments, frame, 0, period);
-  }
-  if (key === "math_blivet") {
-    const edges: Segments = [];
-    for (const cy of [-40, 0, 40]) {
-      const ring = Array.from({ length: 28 }, (_, i): Point2 => {
-        const a = (TAU * i) / 28;
-        return [-68 + 8 * Math.cos(a), cy + 12 * Math.sin(a)];
-      });
-      edges.push(...loop(ring));
-    }
-    // Deliberately incompatible 2D edge continuations, not a hidden 3D mesh.
-    edges.push(
-      [
-        [-68, -52],
-        [62, -22],
-      ],
-      [
-        [-68, -28],
-        [62, 2],
-      ],
-      [
-        [-68, -12],
-        [36, 12],
-      ],
-      [
-        [-68, 12],
-        [62, 42],
-      ],
-      [
-        [-68, 28],
-        [36, 52],
-      ],
-      [
-        [-68, 52],
-        [62, 82],
-      ],
-      [
-        [62, -22],
-        [80, -12],
-      ],
-      [
-        [80, -12],
-        [80, 52],
-      ],
-      [
-        [80, 52],
-        [62, 42],
-      ],
-      [
-        [62, 42],
-        [62, -22],
-      ],
-      [
-        [36, 12],
-        [54, 22],
-      ],
-      [
-        [54, 22],
-        [54, 72],
-      ],
-      [
-        [54, 72],
-        [36, 62],
-      ],
-      [
-        [36, 62],
-        [36, 12],
-      ],
-      [
-        [54, 72],
-        [62, 82],
-      ],
-      [
-        [62, 82],
-        [80, 72],
-      ],
-      [
-        [80, 72],
-        [80, 52],
-      ],
-    );
-    return turnPlanar(
-      edges.map((e) => e.map(([x, y]) => [x, y - 14])),
-      frame,
-      0,
-      period,
-    );
-  }
-  if (key === "math_necker") {
-    const vertices = Array.from({ length: 8 }, (_, i) => [
-      i & 1 ? 1 : -1,
-      i & 2 ? 1 : -1,
-      i & 4 ? 1 : -1,
-    ]);
-    const edges: Edge[] = [];
-    for (let i = 0; i < 8; i++)
-      for (let d = 0; d < 3; d++)
-        if (!(i & (1 << d))) edges.push([i, i ^ (1 << d)]);
-    return wire(vertices, edges, frame * 0.65 + 95, 45, period * 0.65);
-  }
-  if (key === "math_tesseract") {
-    const a = loopAngle(frame, 0.005, period),
-      c = Math.cos(a),
-      s = Math.sin(a),
-      b = loopAngle(frame, 0.0031, period),
-      cb = Math.cos(b),
-      sb = Math.sin(b);
-    const vertices = Array.from({ length: 16 }, (_, i) => {
-      const x = i & 1 ? 1 : -1,
-        y = i & 2 ? 1 : -1,
-        z = i & 4 ? 1 : -1,
-        w = i & 8 ? 1 : -1;
-      const xx = x * c - w * s,
-        ww = w * c + x * s,
-        yy = y * cb - z * sb,
-        zz = z * cb + y * sb,
-        projection = 2.5 / (3.5 - ww);
-      return [xx * projection, yy * projection, zz * projection];
-    });
-    const edges: Edge[] = [];
-    for (let i = 0; i < 16; i++)
-      for (let d = 0; d < 4; d++)
-        if (!(i & (1 << d))) edges.push([i, i ^ (1 << d)]);
-    return wire(vertices, edges, frame * 0.45, 37, period * 0.45);
-  }
-  if (key === "math_trefoil") {
-    const points = Array.from({ length: 120 }, (_, i) => {
-      const t = (TAU * i) / 120,
-        r = 2 + Math.cos(3 * t);
-      return projected(
-        [r * Math.cos(2 * t), r * Math.sin(2 * t), Math.sin(3 * t)],
-        frame,
-        27,
-        period,
-      );
-    });
-    return loop(points);
-  }
-  if (key === "math_hopf") {
-    const a: Point2[] = [],
-      b: Point2[] = [];
-    for (let i = 0; i < 80; i++) {
-      const t = (TAU * i) / 80;
-      a.push(projected([Math.cos(t) - 0.5, Math.sin(t), 0], frame, 52, period));
-      b.push(projected([Math.cos(t) + 0.5, 0, Math.sin(t)], frame, 52, period));
-    }
-    return [...loop(a), ...loop(b)];
-  }
-  if (key === "math_mobius") {
-    const point = (u: number, v: number) =>
-      projected(
-        [
-          (1 + v * Math.cos(u / 2)) * Math.cos(u),
-          (1 + v * Math.cos(u / 2)) * Math.sin(u),
-          v * Math.sin(u / 2),
+  switch (key) {
+    case "math_penrose": {
+      // Three nested cycles with cyclic corner joins; only rotate the 2D illusion.
+      const outer: Point2[] = [
+          [0, -83],
+          [84, 62],
+          [-84, 62],
         ],
-        frame,
-        64,
-        period,
-      );
-    const edges: Segments = [];
-    for (let i = 0; i < 72; i++)
-      for (const v of [-0.35, 0, 0.35])
-        edges.push([point((TAU * i) / 72, v), point((TAU * (i + 1)) / 72, v)]);
-    for (let i = 0; i < 24; i++)
-      edges.push([point((TAU * i) / 24, -0.35), point((TAU * i) / 24, 0.35)]);
-    return edges;
-  }
-  if (Object.prototype.hasOwnProperty.call(meshes, key)) {
-    const mesh = meshes[key];
-    if (mesh.planar) {
-      const points = mesh.vertices.map(
-        ([x, y]): Point2 => [x * mesh.scale, y * mesh.scale],
+        inner: Point2[] = [
+          [0, -31],
+          [38, 35],
+          [-38, 35],
+        ];
+      const middle: Point2[] = [
+        [0, -64],
+        [68, 53],
+        [-68, 53],
+      ];
+      const segments: Segments = [...loop(outer), ...loop(inner)];
+      for (let i = 0; i < 3; i++) {
+        const j = (i + 1) % 3;
+        segments.push(
+          [outer[i], middle[i]],
+          [middle[i], inner[j]],
+          [middle[i], middle[j]],
+        );
+      }
+      return turnPlanar(segments, frame, 0, period);
+    }
+    case "math_blivet": {
+      const edges: Segments = [];
+      for (const cy of [-40, 0, 40]) {
+        const ring = Array.from({ length: 28 }, (_, i): Point2 => {
+          const a = (TAU * i) / 28;
+          return [-68 + 8 * Math.cos(a), cy + 12 * Math.sin(a)];
+        });
+        edges.push(...loop(ring));
+      }
+      // Deliberately incompatible 2D edge continuations, not a hidden 3D mesh.
+      edges.push(
+        [[-68, -52], [62, -22]],
+        [[-68, -28], [62, 2]],
+        [[-68, -12], [36, 12]],
+        [[-68, 12], [62, 42]],
+        [[-68, 28], [36, 52]],
+        [[-68, 52], [62, 82]],
+        [[62, -22], [80, -12]],
+        [[80, -12], [80, 52]],
+        [[80, 52], [62, 42]],
+        [[62, 42], [62, -22]],
+        [[36, 12], [54, 22]],
+        [[54, 22], [54, 72]],
+        [[54, 72], [36, 62]],
+        [[36, 62], [36, 12]],
+        [[54, 72], [62, 82]],
+        [[62, 82], [80, 72]],
+        [[80, 72], [80, 52]],
       );
       return turnPlanar(
-        mesh.edges.map(([a, b]) => [points[a], points[b]]),
+        edges.map((e) => e.map(([x, y]) => [x, y - 14])),
         frame,
-        0.55,
+        0,
         period,
       );
     }
-    return wire(
-      mesh.vertices,
-      mesh.edges,
-      frame * (mesh.speed ?? 0.65) - 40,
-      mesh.scale,
-      period * (mesh.speed ?? 0.65),
-    );
+    case "math_necker": {
+      const vertices = Array.from({ length: 8 }, (_, i) => [
+        i & 1 ? 1 : -1,
+        i & 2 ? 1 : -1,
+        i & 4 ? 1 : -1,
+      ]);
+      const edges: Edge[] = [];
+      for (let i = 0; i < 8; i++)
+        for (let d = 0; d < 3; d++)
+          if (!(i & (1 << d))) edges.push([i, i ^ (1 << d)]);
+      return wire(vertices, edges, frame * 0.65 + 95, 45, period * 0.65);
+    }
+    case "math_tesseract": {
+      const a = loopAngle(frame, 0.005, period),
+        c = Math.cos(a),
+        s = Math.sin(a),
+        b = loopAngle(frame, 0.0031, period),
+        cb = Math.cos(b),
+        sb = Math.sin(b);
+      const vertices = Array.from({ length: 16 }, (_, i) => {
+        const x = i & 1 ? 1 : -1,
+          y = i & 2 ? 1 : -1,
+          z = i & 4 ? 1 : -1,
+          w = i & 8 ? 1 : -1;
+        const xx = x * c - w * s,
+          ww = w * c + x * s,
+          yy = y * cb - z * sb,
+          zz = z * cb + y * sb,
+          projection = 2.5 / (3.5 - ww);
+        return [xx * projection, yy * projection, zz * projection];
+      });
+      const edges: Edge[] = [];
+      for (let i = 0; i < 16; i++)
+        for (let d = 0; d < 4; d++)
+          if (!(i & (1 << d))) edges.push([i, i ^ (1 << d)]);
+      return wire(vertices, edges, frame * 0.45, 37, period * 0.45);
+    }
+    case "math_trefoil": {
+      const points = Array.from({ length: 120 }, (_, i) => {
+        const t = (TAU * i) / 120,
+          r = 2 + Math.cos(3 * t);
+        return projected(
+          [r * Math.cos(2 * t), r * Math.sin(2 * t), Math.sin(3 * t)],
+          frame,
+          27,
+          period,
+        );
+      });
+      return loop(points);
+    }
+    case "math_hopf": {
+      const a: Point2[] = [],
+        b: Point2[] = [];
+      for (let i = 0; i < 80; i++) {
+        const t = (TAU * i) / 80;
+        a.push(projected([Math.cos(t) - 0.5, Math.sin(t), 0], frame, 52, period));
+        b.push(projected([Math.cos(t) + 0.5, 0, Math.sin(t)], frame, 52, period));
+      }
+      return [...loop(a), ...loop(b)];
+    }
+    case "math_mobius": {
+      const point = (u: number, v: number) =>
+        projected(
+          [
+            (1 + v * Math.cos(u / 2)) * Math.cos(u),
+            (1 + v * Math.cos(u / 2)) * Math.sin(u),
+            v * Math.sin(u / 2),
+          ],
+          frame,
+          64,
+          period,
+        );
+      const edges: Segments = [];
+      for (let i = 0; i < 72; i++)
+        for (const v of [-0.35, 0, 0.35])
+          edges.push([point((TAU * i) / 72, v), point((TAU * (i + 1)) / 72, v)]);
+      for (let i = 0; i < 24; i++)
+        edges.push([point((TAU * i) / 24, -0.35), point((TAU * i) / 24, 0.35)]);
+      return edges;
+    }
+    default: {
+      if (Object.prototype.hasOwnProperty.call(meshes, key)) {
+        const mesh = meshes[key];
+        if (mesh.planar) {
+          const points = mesh.vertices.map(
+            ([x, y]): Point2 => [x * mesh.scale, y * mesh.scale],
+          );
+          return turnPlanar(
+            mesh.edges.map(([a, b]) => [points[a], points[b]]),
+            frame,
+            0.55,
+            period,
+          );
+        }
+        return wire(
+          mesh.vertices,
+          mesh.edges,
+          frame * (mesh.speed ?? 0.65) - 40,
+          mesh.scale,
+          period * (mesh.speed ?? 0.65),
+        );
+      }
+      throw new RangeError(`Unknown mathematical figure: ${key}`);
+    }
   }
-  throw new RangeError(`Unknown mathematical figure: ${key}`);
 }

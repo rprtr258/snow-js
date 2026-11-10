@@ -3,14 +3,15 @@
 // in bun and its RGBA output can be pinned byte-exactly with snapshots: any
 // change to simulation or rasterization that alters a single rendered pixel
 // fails here. Review the .snap diff, then run `bun test -u` to accept the
-// new image. The JS rasterizer is the reference (AGENTS.md); the wasm kernel
+// new image. The JS rasterizer is the reference; the wasm kernel
 // must stay byte-identical to it, which the last test enforces.
 import {expect, test} from "bun:test";
+import {CATALOG} from "./catalog";
 import {ViewerRuntime} from "./viewer-runtime";
-import type {Catalog, RawOptions} from "./types";
+import type {RawOptions} from "./types";
 
-// Game-shipped inputs (see AGENTS.md): the effect catalog (effects.json), the
-// pixel data decoded from effects.bin, and the optional wasm raster kernel.
+// Game-shipped inputs: the effect catalog (effects.json, statically imported),
+// the pixel data decoded from effects.bin, and the wasm raster kernel.
 const ASSETS = new URL("../static/assets/", import.meta.url);
 
 // Half of the 480×320 preview on each axis at the same world→pixel scale
@@ -22,7 +23,6 @@ const HEIGHT = 160;
 // Explicit replay state: pinned pixels must not depend on option defaults.
 const SEEDS = {worldSeed: 1, emissionSeed: 1, lifetimeSeed: 1};
 
-const catalog: Catalog = await Bun.file(new URL("effects.json", ASSETS)).json();
 const assetsBuffer = await Bun.file(new URL("effects.bin", ASSETS)).arrayBuffer();
 const kernelModule = await WebAssembly.compile(
   await Bun.file(new URL("raster.wasm", ASSETS)).arrayBuffer(),
@@ -30,7 +30,7 @@ const kernelModule = await WebAssembly.compile(
 
 function runtime(kernel: WebAssembly.Module | null = null) {
   // slice(0): a runtime may take ownership of the asset buffer.
-  return new ViewerRuntime(catalog, assetsBuffer.slice(0), WIDTH, HEIGHT, kernel);
+  return new ViewerRuntime(CATALOG, assetsBuffer.slice(0), WIDTH, HEIGHT, kernel);
 }
 
 // Advance `frames` simulation steps — each one renders, as in live playback —
@@ -100,7 +100,7 @@ test("monochrome takes the JS compositor with grayscale textures", () => {
   ).toMatchSnapshot();
 });
 
-// AGENTS.md: the software renderer's image is the reference — the wasm
+// the software renderer's image is the reference — the wasm
 // accelerator must rasterize the identical frame. accelerated proves the
 // wasm kernel actually ran. 240 rasterizations exceed bun's 5 s default,
 // hence the explicit timeout.

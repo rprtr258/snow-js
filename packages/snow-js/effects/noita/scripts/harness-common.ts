@@ -2,6 +2,7 @@
 // checked-in assets from static/assets/ and reproduces the fullscreen
 // replay's exact simulation and render configuration.
 import { readFileSync } from "node:fs";
+import { CATALOG } from "../src/catalog";
 import { decodeAssets, makeSimulation } from "../src/effect-simulation";
 import { SoftwareRenderer } from "../src/software-renderer";
 import { fullscreenView } from "../src/render-resolution";
@@ -10,6 +11,8 @@ import type { PortalSimulation } from "../src/portal-physics";
 import type { Catalog, Resources, SimulationOptions } from "../src/types";
 
 const ROOT = new URL("..", import.meta.url).pathname;
+const bin = readFileSync(`${ROOT}static/assets/effects.bin`);
+const harnessBuffer = bin.buffer.slice(bin.byteOffset, bin.byteOffset + bin.byteLength);
 
 export type Harness = {
   catalog: Catalog;
@@ -19,21 +22,17 @@ export type Harness = {
   renderKernelModule: WebAssembly.Module;
 };
 
-export function loadHarness(): Harness {
-  const catalog: Catalog = JSON.parse(
-    readFileSync(`${ROOT}static/assets/effects.json`, "utf8"),
-  );
-  const bin = readFileSync(`${ROOT}static/assets/effects.bin`);
-  const buffer = bin.buffer.slice(bin.byteOffset, bin.byteOffset + bin.byteLength);
-  const resources = decodeAssets(catalog, buffer);
-  const kernelModule = new WebAssembly.Module(
+export const HARNESS: Harness = {
+  catalog: CATALOG,
+  resources: decodeAssets(CATALOG, harnessBuffer),
+  buffer: harnessBuffer,
+  kernelModule: new WebAssembly.Module(
     readFileSync(`${ROOT}static/assets/raster.wasm`),
-  );
-  const renderKernelModule = new WebAssembly.Module(
+  ),
+  renderKernelModule: new WebAssembly.Module(
     Buffer.from(RENDER_KERNEL_WASM, "base64"),
-  );
-  return { catalog, resources, buffer, kernelModule, renderKernelModule };
-}
+  ),
+};
 
 // The fullscreen replay's render options after the runtime's
 // normalizeOptions/renderOptions round-trip: color null, background 0.

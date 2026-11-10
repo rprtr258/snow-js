@@ -8,6 +8,7 @@
     "allowJs": false,
     "alwaysStrict": true,
     "types": ["bun"],
+    "resolveJsonModule": true,
 
     // Bundler mode
     "moduleResolution": "bundler",

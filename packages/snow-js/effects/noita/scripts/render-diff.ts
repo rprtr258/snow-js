@@ -27,7 +27,7 @@ import {
   buildRenderer,
   buildSimulation,
   hashPixels,
-  loadHarness,
+  HARNESS,
   meditationReplay,
   MEDITATION_RENDER,
   type Harness,
@@ -38,13 +38,7 @@ import {
   PREVIEW_RENDER_WIDTH,
 } from "../src/render-resolution";
 import { ViewerRuntime } from "../src/viewer-runtime";
-
-type LoopCatalog = {
-  version: number;
-  speeds: number[];
-  seconds: number[];
-  recipes: Record<string, {origin: number; matches: Record<string, [number, number, number][]>}>;
-};
+import exportLoopsJson from "../static/assets/export-loops.json";
 
 const DRIFT_FRAMES = 600; // rendered frames compared for drift
 const EMISSION_FRAMES = 1000; // emission-count identity window
@@ -83,14 +77,11 @@ function fixtureUrl(path: string): URL {
 // export-loops.json meditation recipe, speed 1, first recorded match
 // ([period, offset, score]); the GIF consumer loops from `offset` for
 // `period` frames, so the spot-check frame is offset + period.
-function exportLoopSteps(): number {
-  const loops: LoopCatalog = JSON.parse(
-    readFileSync(new URL("../static/assets/export-loops.json", import.meta.url), "utf8"),
-  );
-  const match = loops.recipes["meditation"].matches["1"]?.[0];
+const EXPORT_LOOP_STEPS = (() => {
+  const match = exportLoopsJson.recipes["meditation"].matches["1"]?.[0];
   if (!match) throw new Error("export-loops.json: no meditation match for speed 1");
   return match[1] + match[0];
-}
+})();
 
 // One GIF-consumer frame through the real preview runtime (ViewerRuntime:
 // the path gif-renderer.ts drives), default preview options (core+glow on).
@@ -144,7 +135,7 @@ function recordExactRun(harness: Harness): {
     alphaBad += result.alphaBad;
     frameHashes.push(result.hash);
   }
-  const exportLoop = consumerFrameHashes(harness, "meditation", exportLoopSteps());
+  const exportLoop = consumerFrameHashes(harness, "meditation", EXPORT_LOOP_STEPS);
   const math = consumerFrameHashes(harness, "math_penrose", MATH_FRAMES);
   return {
     frameHashes,
@@ -319,7 +310,7 @@ function updateBaseline(harness: Harness, path: string): boolean {
       width: PREVIEW_RENDER_WIDTH,
       height: PREVIEW_RENDER_HEIGHT,
       frames: DRIFT_FRAMES,
-      exportSteps: exportLoopSteps(),
+      exportSteps: EXPORT_LOOP_STEPS,
       mathEffect: "math_penrose",
       mathFrames: MATH_FRAMES,
       generator: "bun scripts/render-diff.ts --update-baseline",
@@ -374,7 +365,7 @@ function exactRegression(harness: Harness, path: string): boolean {
 
 // ---- entry ----------------------------------------------------------------
 
-const harness = loadHarness();
+const harness = HARNESS;
 const baselineMode =
   process.argv.includes("--exact-regression") ||
   process.argv.includes("--against") ||

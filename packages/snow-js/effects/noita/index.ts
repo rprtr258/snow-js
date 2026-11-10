@@ -28,7 +28,7 @@ function catalogEntries(group: string): SelectEntry[] {
 const gameGroups: SelectGroup[] = [
   {
     label: "Portals",
-    entries: Object.entries(PORTAL_EFFECTS).map(([key, e]) => ({value: key, label: e.label})),
+    entries: Object.entries(PORTAL_EFFECTS).map(([key, label]) => ({value: key, label})),
   },
   {
     label: CATALOG_GROUP_LABELS["objects"]!,
