@@ -3,7 +3,7 @@
 // scene after each frame across randomized configs (colors, wide, onGrid,
 // drawLong, alpha boundaries, .5 coordinates, edge clamping, odd counts).
 // Run: bun scripts/proto-render-kernel.ts
-import { RENDER_KERNEL_WASM } from "../src/render-kernel-wasm";
+import { readFileSync } from "node:fs";
 
 function roundCell(v: number): number {
   return Math.floor(v + (v >= 0 ? 0.5 : -0.5));
@@ -89,7 +89,9 @@ function mulberry32(seed: number): () => number {
   };
 }
 
-const kernelBytes = Uint8Array.from(atob(RENDER_KERNEL_WASM), (c) => c.charCodeAt(0));
+const kernelBytes = new Uint8Array(
+  readFileSync(new URL("../static/assets/render-kernel.wasm", import.meta.url)),
+);
 const kernelModule = new WebAssembly.Module(kernelBytes);
 const memory = new WebAssembly.Memory({ initial: 32 });
 const instance = new WebAssembly.Instance(kernelModule, { env: { mem: memory } });

@@ -1,5 +1,6 @@
 // Host for the wasm blend kernel (src/render-kernel.wat, built by
-// scripts/build-render-kernel.ts into src/render-kernel-wasm.ts). The kernel
+// scripts/build-render-kernel.ts into the binary committed at
+// static/assets/render-kernel.wasm). The kernel
 // walks the simulation's staged particle columns as f64x2 pairs and blends
 // every visible particle into the scene, byte-identical to the JS blend loop
 // in SoftwareRenderer.render (verified by scripts/proto-render-kernel.ts and
@@ -18,7 +19,6 @@
 // own memory — the blend instance's memory is the renderer's scene canvas,
 // and growing for noise scratch must never detach those views.
 import { SIMPLEX_PERMUTATION, SIMPLEX_GRADIENTS } from "./portal-physics";
-import { RENDER_KERNEL_WASM } from "./render-kernel-wasm";
 
 // Kernel meta word layout (see render-kernel.wat): bits 0-2 flags
 // (bit0 onGrid === false, bit1 drawLong, bit2 wide), bits 8-31 color as
@@ -61,18 +61,19 @@ type NoiseExport = (
 const NOISE_GRAD_BYTES = 512;
 const NOISE_TABLE_BYTES = 800;
 
-// Compiles the embedded kernel binary. Returns null where WebAssembly (or its
-// base64 decode) is unavailable; every caller must fall back to the JS blend.
-export const compileRenderKernel: WebAssembly.Module | null = (() => {
+// Compiles the kernel binary loaded from static/assets/ (the embed fetches
+// it; bun tests and scripts read the file). Returns null where fetch or
+// WebAssembly is unavailable; every caller must fall back to the JS blend.
+export async function loadRenderKernelModule(): Promise<WebAssembly.Module | null> {
   try {
-    const base64 = atob(RENDER_KERNEL_WASM);
-    const bytes = new Uint8Array(base64.length);
-    for (let i = 0; i < base64.length; i++) bytes[i] = base64.charCodeAt(i);
-    return new WebAssembly.Module(bytes);
+    const response = await fetch(new URL("../static/assets/render-kernel.wasm", import.meta.url));
+    return response.ok
+      ? await WebAssembly.compile(await response.arrayBuffer())
+      : null;
   } catch {
     return null;
   }
-})();
+}
 
 export class RenderKernel {
   declare memory: WebAssembly.Memory;

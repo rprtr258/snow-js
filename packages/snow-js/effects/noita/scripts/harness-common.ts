@@ -6,7 +6,6 @@ import { CATALOG } from "../src/catalog";
 import { decodeAssets, makeSimulation } from "../src/effect-simulation";
 import { SoftwareRenderer } from "../src/software-renderer";
 import { fullscreenView } from "../src/render-resolution";
-import { RENDER_KERNEL_WASM } from "../src/render-kernel-wasm";
 import type { PortalSimulation } from "../src/portal-physics";
 import type { Catalog, Resources, SimulationOptions } from "../src/types";
 
@@ -30,7 +29,7 @@ export const HARNESS: Harness = {
     readFileSync(`${ROOT}static/assets/raster.wasm`),
   ),
   renderKernelModule: new WebAssembly.Module(
-    Buffer.from(RENDER_KERNEL_WASM, "base64"),
+    readFileSync(`${ROOT}static/assets/render-kernel.wasm`),
   ),
 };
 

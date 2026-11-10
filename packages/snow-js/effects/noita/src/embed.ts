@@ -7,11 +7,12 @@ import { EFFECTS } from "./portal-physics";
 import { MATH_EFFECTS } from "./math-figures";
 import { MATH_TRAIL_SCALE } from "./math-settings";
 import { CATALOG } from "./catalog";
-import { compileRenderKernel } from "./render-kernel";
+import { loadRenderKernelModule } from "./render-kernel";
 import { fullscreenView, PREVIEW_HEIGHT, RESOLUTION_SCALE } from "./render-resolution";
 import { Catalog, RawOptions, SimulationOptions } from "./types";
 
-// raster.wasm lives under static/assets/; the embed loads it directly.
+// raster.wasm and render-kernel.wasm live under static/assets/; the embed
+// loads both directly.
 async function loadEmbedRasterModule(): Promise<WebAssembly.Module | null> {
   try {
     const response = await fetch(
@@ -243,9 +244,10 @@ export class Noita {
 
   private async init() {
     try {
-      const [bin, kernelModule] = await Promise.all([
+      const [bin, kernelModule, renderKernelModule] = await Promise.all([
         fetchBin(),
         loadEmbedRasterModule(),
+        loadRenderKernelModule(),
       ]);
       if (this.disposed) return;
       this.catalog = CATALOG;
@@ -256,7 +258,7 @@ export class Noita {
         message.width!,
         message.height!,
         kernelModule,
-        {scale: message.scale!, renderKernelModule: compileRenderKernel},
+        {scale: message.scale!, renderKernelModule},
       );
       this.inline.restart(this.replay(), this.revision);
       const result = this.inline.frame({

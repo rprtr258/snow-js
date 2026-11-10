@@ -12,11 +12,14 @@
 //    the same pre-step state and aligns lanes with the compaction loop.
 import { expect, test } from "bun:test";
 import { RenderKernel } from "./render-kernel";
-import { RENDER_KERNEL_WASM } from "./render-kernel-wasm";
 import { NoitaRandom, PortalSimulation, simplex3, SIMPLEX_GRADIENTS } from "./portal-physics";
 import type { Particle } from "./types";
 const kernel = new RenderKernel(
-  new WebAssembly.Module(Buffer.from(RENDER_KERNEL_WASM, "base64")),
+  await WebAssembly.compile(
+    await Bun.file(
+      new URL("../static/assets/render-kernel.wasm", import.meta.url),
+    ).arrayBuffer(),
+  ),
 );
 
 // Deterministic fuzz inputs (a failure must reproduce).
