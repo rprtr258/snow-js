@@ -33,7 +33,7 @@ export function buildEffectForm(
   def: EffectDefinition,
   instance: EffectInstance,
   onChange: (changed: OptionValues) => void,
-): {dispose(): void} {
+): () => void {
   const values: OptionValues = initialValues(def);
   // UI mirrors for nullable colors: a checkbox plus a color picker collapse
   // into one string | null option value.
@@ -126,23 +126,14 @@ export function buildEffectForm(
   }
 
   function addAll(): void {
-    for (const spec of def.options) {
-      switch (spec.kind) {
-        case "number":
-          bindNumber(spec);
-          break;
-        case "boolean":
-          bindBoolean(spec);
-          break;
-        case "color":
-          bindColor(spec);
-          break;
-        case "select":
-          bindSelect(spec);
-          break;
-        case "action":
-          bindAction(spec);
-          break;
+    for (const opt of def.options) {
+      switch (opt.kind) {
+        case "number": bindNumber(opt); break;
+        case "boolean": bindBoolean(opt); break;
+        case "color": bindColor(opt); break;
+        case "select": bindSelect(opt); break;
+        case "action": bindAction(opt); break;
+        default: opt satisfies never;
       }
     }
     applyVisibility();
@@ -205,9 +196,5 @@ export function buildEffectForm(
 
   addAll();
 
-  return {
-    dispose(): void {
-      disposed = true;
-    },
-  };
+  return () => disposed = true;
 }

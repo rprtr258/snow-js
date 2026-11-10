@@ -37,10 +37,10 @@ function applyBackgroundImage(): void {
 const effectState = {effect: "snow"};
 let current: {instance: EffectInstance} | null = null;
 let optionsFolder: FolderApi | null = null;
-let currentForm: {dispose(): void} | null = null;
+let currentForm: (() => void) | null = null;
 
 function activate(key: string): void {
-  currentForm?.dispose();
+  currentForm?.();
   currentForm = null;
   current?.instance.unmount();
   current = null;

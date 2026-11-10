@@ -1,5 +1,5 @@
 // Public API: the effect registry and the schema vocabulary effects and hosts
-// share. Each effect lives in effects/<name>/ and is registered in
+// share. Each effect lives in <name>/ and is registered in
 // registry.ts; hosts render forms from option specs and drive instances.
 import {action, bool, color, defineEffect, initialValues, num, select} from "./effect.ts";
 import {createEffect, EFFECTS, getEffect, type EffectKey} from "./registry.ts";

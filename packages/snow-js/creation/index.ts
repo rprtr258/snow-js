@@ -1,5 +1,5 @@
 // Psychedelic tunnel (http://www.pouet.net/prod.php?which=57245).
-import {defineEffect, num} from "../../effect.ts";
+import {defineEffect, num} from "../effect.ts";
 import {createGlslEffect} from "../glsl-effect.ts";
 
 const FRAGMENT_GLSL = `

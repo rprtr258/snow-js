@@ -13,7 +13,7 @@ import {
   type OptionValues,
   type SelectEntry,
   type SelectGroup,
-} from "../../effect.ts";
+} from "../effect.ts";
 import {Noita, type NoitaCollection} from "./src/embed.ts";
 import {EFFECTS as PORTAL_EFFECTS} from "./src/portal-physics.ts";
 import {MATH_EFFECTS, MATH_GROUPS} from "./src/math-figures.ts";

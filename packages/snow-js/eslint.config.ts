@@ -9,9 +9,9 @@ export default defineConfig([
   },
   {
     // snow-js sources: strict house style, type-checked against tsconfig.json.
-    // effects/noita/ uses a lighter ruleset below.
+    // noita/ uses a lighter ruleset below.
     files: ["**/*.ts", "*.ts"],
-    ignores: ["effects/noita/**"],
+    ignores: ["noita/**"],
     languageOptions: {
       parserOptions: {
         parser: tseslint.parser,
@@ -22,11 +22,11 @@ export default defineConfig([
   },
   ...tseslint.configs.recommendedTypeChecked.map((config) => ({
     ...config,
-    ignores: ["effects/noita/**"],
+    ignores: ["noita/**"],
   })),
   {
     files: ["**/*.ts", "*.ts"],
-    ignores: ["effects/noita/**"],
+    ignores: ["noita/**"],
     plugins: {
       "@stylistic": stylistic,
       import: importPlugin,
@@ -69,7 +69,7 @@ export default defineConfig([
   {
     // noita: the ported sources are strictly typed, so an explicit `any` is a
     // lint error; this is the only rule noita enforces for now.
-    files: ["effects/noita/src/**/*.ts", "effects/noita/scripts/**/*.ts"],
+    files: ["noita/src/**/*.ts", "noita/scripts/**/*.ts"],
     plugins: {"@typescript-eslint": tseslint.plugin},
     languageOptions: {parser: tseslint.parser},
     rules: {"@typescript-eslint/no-explicit-any": "error"},

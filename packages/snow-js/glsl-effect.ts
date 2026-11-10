@@ -1,7 +1,7 @@
 // Shared lifecycle for glsl effects: canvas setup, cached uniform
 // values, time accumulation. Extracted from the former Snow component.
-import {createGL, VERTEX_GLSL} from "../glsl.ts";
-import type {EffectInstance, OptionValues} from "../effect.ts";
+import {createGL, VERTEX_GLSL} from "./glsl.ts";
+import type {EffectInstance, OptionValues} from "./effect.ts";
 
 export type UniformMap = Record<string, number | [number, number, number, number]>;
 

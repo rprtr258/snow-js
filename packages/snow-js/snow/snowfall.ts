@@ -1,7 +1,7 @@
 // Layered snowfall ("light snow" / "blizzard" shadertoy adaptation,
 // https://www.shadertoy.com/view/ldsGDn). Own shader module, consumed by the
 // snow effect's "snowfall" preset; not a standalone registry entry.
-import {defineEffect, num, type InferOptions} from "../../effect.ts";
+import {defineEffect, num, type InferOptions} from "../effect.ts";
 import {createGlslEffect, type UniformMap} from "../glsl-effect.ts";
 
 const FRAGMENT_GLSL = `

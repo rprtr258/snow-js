@@ -29,7 +29,7 @@
     "noUnusedParameters": true,
     "noPropertyAccessFromIndexSignature": true
   },
-  // Build output only; effects/noita/src and effects/noita/scripts are
+  // Build output only; noita/src and noita/scripts are
   // type-checked here.
-  "exclude": ["effects/noita/dist"]
+  "exclude": ["noita/dist"]
 }

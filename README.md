@@ -54,7 +54,7 @@ bun run dev:website   # website with the tweakpane playground
 
 ## Adding a new effect
 
-1. Create `packages/snow-js/effects/<name>/index.ts` with a default-exported
+1. Create `packages/snow-js/<name>/index.ts` with a default-exported
    definition. The option schema is a plain object built from the `num` /
    `bool` / `color` / `select` / `action` helpers; defaults live in the schema
    and `InferOptions` derives the options struct from it:
@@ -96,17 +96,16 @@ packages/snow-js/
   effect.ts            abstraction: specs, schema helpers, defineEffect
   registry.ts          EFFECTS object, createEffect/getEffect
   glsl.ts              WebGL quad renderer (shader effects)
-  effects/
-    glsl-effect.ts    shared lifecycle for fragment-shader effects
-    snow/              "Snow" — preset "snow": flat snow
+  glsl-effect.ts       shared lifecycle for fragment-shader effects
+  snow/                "Snow" — preset "snow": flat snow
                        (shadertoy 4sX3z2); preset "snowfall": layered
                        blizzard (shadertoy ldsGDn)
-      snowfall.ts      the snowfall shader + options, used by snow's
+    snowfall.ts        the snowfall shader + options, used by snow's
                        "snowfall" preset (not a standalone effect)
-    creation/          "Creation" — psychedelic tunnel (pouet 57245)
-    noita/             "Noita" — Noita portals, objects, original math figures
-      src/             ported simulation + software renderer + embed viewer
-      static/assets/   checked-in effect catalog (effects.json/bin) + wasm
+  creation/            "Creation" — psychedelic tunnel (pouet 57245)
+  noita/               "Noita" — Noita portals, objects, original math figures
+    src/               ported simulation + software renderer + embed viewer
+    static/assets/     checked-in effect catalog (effects.json/bin) + wasm
 ```
 
 ## Development
@@ -119,5 +118,5 @@ bun run typecheck     # both packages
 cd packages/snow-js && bun test   # noita kernels, render snapshots, schema tests
 ```
 
-Noita's browser side is its embed viewer (effects/noita/src/embed.ts); the
+Noita's browser side is its embed viewer (noita/src/embed.ts); the
 simulation and raster code are untouched by the registry layer.

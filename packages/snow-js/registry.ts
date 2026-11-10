@@ -1,8 +1,8 @@
 // The effect registry: every effect the library ships, in dropdown order.
 import type {EffectDefinition, EffectInstance} from "./effect.ts";
-import creation from "./effects/creation/index.ts";
-import noita from "./effects/noita/index.ts";
-import snow from "./effects/snow/index.ts";
+import creation from "./creation/index.ts";
+import noita from "./noita/index.ts";
+import snow from "./snow/index.ts";
 
 export const EFFECTS = {
   snow,
@@ -19,16 +19,21 @@ function isEffectKey(key: string): key is EffectKey {
   return key in EFFECTS;
 }
 
-// Known keys get options checked against the effect's own schema; any other
-// string key (e.g. a host UI's dropdown) is accepted with the erased bag.
-export function createEffect<K extends EffectKey>(el: Element, key: K | (string & {}), options?: Partial<OptionsForKey<K>>): EffectInstance {
-  if (!isEffectKey(key))
-    throw new RangeError(`Unknown effect: ${key}`);
-  return EFFECTS[key].create(el, options);
-}
-
 export function getEffect(key: string): EffectDefinition | undefined {
   if (!isEffectKey(key))
     return undefined;
   return EFFECTS[key];
+}
+
+// Known keys get options checked against the effect's own schema; any other
+// string key (e.g. a host UI's dropdown) is accepted with the erased bag.
+export function createEffect<K extends EffectKey>(
+  el: Element,
+  key: K | (string & {}),
+  options?: Partial<OptionsForKey<K>>,
+): EffectInstance {
+  const ef = getEffect(key);
+  if (ef === undefined)
+    throw new RangeError(`Unknown effect: ${key}`);
+  return ef.create(el, options);
 }

@@ -2,7 +2,7 @@
 // (https://www.shadertoy.com/view/4sX3z2) and layered snowfall, whose shader
 // and options live in ./snowfall.ts. The preset option picks which
 // shader runs; option visibility follows it.
-import {bool, defineEffect, num, select, type EffectInstance, type InferOptions, type OptionValues} from "../../effect.ts";
+import {bool, defineEffect, num, select, type EffectInstance, type InferOptions, type OptionValues} from "../effect.ts";
 import snowfall, {options as snowfallOptions} from "./snowfall.ts";
 import {createGlslEffect, type UniformMap} from "../glsl-effect.ts";
 
