@@ -20,9 +20,7 @@ import {MATH_EFFECTS, MATH_GROUPS} from "./src/math-figures.ts";
 import {CATALOG_EFFECTS, CATALOG_GROUP_LABELS} from "./src/effect-metadata.ts";
 
 function catalogEntries(group: string): SelectEntry[] {
-  return CATALOG_EFFECTS
-    .filter((meta) => meta.group === group)
-    .map((meta) => ({value: meta.key, label: meta.label}));
+  return CATALOG_EFFECTS[group].map(({key, label}) => ({value: key, label}));
 }
 
 const gameGroups: SelectGroup[] = [
