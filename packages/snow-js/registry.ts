@@ -1,6 +1,7 @@
 // The effect registry: every effect the library ships, in dropdown order.
 import type {EffectDefinition, EffectInstance} from "./effect.ts";
 import creation from "./creation/index.ts";
+import fluid from "./fluid/index.ts";
 import galaxy from "./galaxy/index.ts";
 import noita from "./noita/index.ts";
 import snow from "./snow/index.ts";
@@ -9,6 +10,7 @@ export const EFFECTS = {
   snow,
   creation,
   galaxy,
+  fluid,
   noita,
 };
 
