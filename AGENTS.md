@@ -20,9 +20,10 @@ bun test                   # all workspaces; ~6s: schema, noita kernel, render s
 CI (PRs and pushes to `master`) runs: check:wasm, lint, typecheck, website
 build, tests. Pushes to `master` also deploy the website build to gh-pages.
 
-After editing `packages/snow-js/noita/src/render-kernel.wat`, rebuild the
-committed binary: `cd packages/snow-js/noita && bun scripts/build-render-kernel.ts`,
-then commit the new `static/assets/render-kernel.wasm` (CI fails on stale wasm).
+After editing a `packages/snow-js/<effect>/src/render-kernel.wat` (noita or
+galaxy), rebuild the committed binary:
+`cd packages/snow-js && bun scripts/build-render-kernel.ts <effect>`, then
+commit the new `static/assets/render-kernel.wasm` (CI fails on stale wasm).
 
 ## Architecture
 

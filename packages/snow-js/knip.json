@@ -1,10 +1,12 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  // bun test files and the manually run noita/scripts/*.ts tools are
-  // entry points. The package.json exports (index.ts) is an entry point as
-  // well. Nested noita/src/*.test.ts are covered by knip's built-in test
-  // plugin patterns, so only the root-level test glob is listed.
+  // bun test files and the manually run wasm build tool (scripts/*.ts) plus
+  // noita's script entry points are entries. The package.json exports
+  // (index.ts) is an entry point as well. Nested */src/*.test.ts are covered
+  // by knip's built-in test plugin patterns, so only the root-level test glob
+  // is listed.
   "entry": [
+    "scripts/*.ts",
     "noita/scripts/*.ts",
     "*.test.ts"
   ]

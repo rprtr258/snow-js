@@ -1,5 +1,5 @@
-// Host for the wasm blend kernel (src/render-kernel.wat, built by
-// scripts/build-render-kernel.ts into the binary committed at
+// Host for the wasm blend kernel (src/render-kernel.wat, built by the
+// package-level scripts/build-render-kernel.ts into the binary committed at
 // static/assets/render-kernel.wasm). The kernel
 // walks the simulation's staged particle columns as f64x2 pairs and blends
 // every visible particle into the scene, byte-identical to the JS blend loop
