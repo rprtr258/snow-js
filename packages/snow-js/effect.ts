@@ -70,7 +70,6 @@ export type EffectInstance = {
   stop(): void,
   update(options: Partial<OptionValues>): void,
   restart?(): void,
-  unmount(): void,
 };
 
 export type EffectDefinition<O extends OptionValues = OptionValues> = {
@@ -78,7 +77,8 @@ export type EffectDefinition<O extends OptionValues = OptionValues> = {
   group: string,
   description?: string,
   options: KeyedSpec[],
-  create(el: Element, options?: Partial<O>): EffectInstance,
+  // The host owns the canvas: it creates and appends it, the effect draws on it.
+  create(canvas: HTMLCanvasElement, options?: Partial<O>): EffectInstance,
 };
 
 export function num(value: number, opts: Omit<NumberSpec, "kind" | "default">): NumberSpec {
@@ -122,7 +122,7 @@ export function defineEffect<S extends OptionsSchema>(def: {
   group?: string,
   description?: string,
   options: S,
-  create(el: Element, options: InferOptions<S>): EffectInstance,
+  create(canvas: HTMLCanvasElement, options: InferOptions<S>): EffectInstance,
 }): EffectDefinition<InferOptions<S>> {
   const options: KeyedSpec[] = Object.entries(def.options).map(([key, spec]) => ({...spec, key}));
   const defaults = resolveDefaults(def.options);

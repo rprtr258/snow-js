@@ -13,21 +13,25 @@ file plus a registry entry, with no per-effect frontend code.
 - **Typed options.** Schemas are built from `num` / `bool` / `color` /
   `select` / `action` helpers; `InferOptions` derives the options struct from
   the schema, so `createEffect` calls are checked at compile time.
-- **One tiny interface.** Instances expose `start` / `stop` / `update` /
-  `unmount` (plus optional `restart`); WebGL plumbing, workers and wasm stay
-  inside each effect.
+- **One tiny interface.** Instances expose `start` / `stop` / `update`
+  (plus optional `restart`); the host owns the canvas — it creates one and
+  hands it to `createEffect`, and effects draw on it. WebGL plumbing, workers
+  and wasm stay inside each effect.
 - **Zero runtime dependencies.** Ships as TypeScript source.
-- **Three effects built in.** `snow` (flat snow + layered `snowfall`
-  blizzard preset), `creation` (psychedelic tunnel), `noita` (Noita-style
-  portals, objects and math figures).
+- **Four effects built in.** `snow` (flat snow + layered `snowfall`
+  blizzard preset), `creation` (psychedelic tunnel), `galaxy` (chaotic
+  particle streams on a fading canvas), `noita` (Noita-style portals,
+  objects and math figures).
 
 ```ts
 import {createEffect} from "@rprtr258/snow-js";
 
-const instance = createEffect(container, "snow", {speed: 5}); // checked against snow's schema
+const canvas = document.createElement("canvas");
+container.append(canvas);
+const instance = createEffect(canvas, "snow", {speed: 5}); // checked against snow's schema
 instance.start();
 instance.update({amount: 0.3}); // live option updates, no remount
-instance.unmount();
+instance.stop(); // drop the canvas (or reuse it for another effect) when done
 ```
 
 ## Getting started
@@ -60,18 +64,17 @@ bun run dev:website   # website with the tweakpane playground
    and `InferOptions` derives the options struct from it:
 
    ```ts
-   import {defineEffect, num} from "../../effect.ts";
-   import {createShaderEffect} from "../glsl-effect.ts";
+   import {defineEffect, num} from "../effect.ts";
+   import {createGlslEffect} from "../glsl-effect.ts";
 
    const options = {
      speed: num(10, {label: "speed", min: 0, max: 20}),
    };
 
    export default defineEffect({
-     key: "my-effect",
      label: "My effect",
      options,
-     create: (el, values) => createShaderEffect(el, {
+     create: (canvas, values) => createGlslEffect(canvas, {
        fragment: FRAGMENT_GLSL,
        values,
        toUniforms: () => ({}),
@@ -84,7 +87,8 @@ bun run dev:website   # website with the tweakpane playground
 
 That is all: the website picks the effect up in its dropdown and renders its
 form automatically. An effect instance implements `start` / `stop` / `update`
-/ `unmount` (plus optional `restart`); everything else — WebGL plumbing,
+(plus optional `restart`) and draws on the `HTMLCanvasElement` the host passes
+to `create`; everything else — WebGL plumbing,
 worker pipelines, asset loading — is the effect's internal business. Async
 loading (noita's wasm/catalog assets) happens inside the instance; the registry
 itself is synchronous.

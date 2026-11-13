@@ -51,6 +51,8 @@ type GL = {
     } & Record<string, WebGLUniformLocation | null>,
   },
   running: boolean,
+  // Deletes the program so the canvas's context can be reused by a new one.
+  dispose(): void,
 };
 
 export function createGL(
@@ -162,6 +164,9 @@ export function createGL(
       else if (innerRunning && !value)
         removeListeners();
       innerRunning = value;
+    },
+    dispose(): void {
+      ctx.deleteProgram(program);
     },
   };
 }

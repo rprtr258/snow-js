@@ -25,8 +25,7 @@ function channels(value: string): [number, number, number] {
   return [(packed >> 16) & 255, (packed >> 8) & 255, packed & 255];
 }
 
-function create(el: Element, values: GalaxyValues): EffectInstance {
-  const canvas = el instanceof HTMLCanvasElement ? el : el.appendChild(document.createElement("canvas"));
+function create(canvas: HTMLCanvasElement, values: GalaxyValues): EffectInstance {
   canvas.style.width = "100%";
   canvas.style.height = "100%";
   const context = canvas.getContext("2d", {willReadFrequently: true});
@@ -176,11 +175,6 @@ function create(el: Element, values: GalaxyValues): EffectInstance {
       current = {...current, ...options};
       if (kernel !== null && typeof color === "string")
         setGains(kernel, channels(color));
-    },
-    unmount(): void {
-      running = false;
-      kernel = null;
-      canvas.parentNode?.removeChild(canvas);
     },
   };
 }

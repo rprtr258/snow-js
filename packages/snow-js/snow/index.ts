@@ -3,8 +3,8 @@
 // and options live in ./snowfall.ts. The preset option picks which
 // shader runs; option visibility follows it.
 import {bool, defineEffect, num, select, type EffectInstance, type InferOptions, type OptionValues} from "../effect.ts";
-import snowfall, {options as snowfallOptions} from "./snowfall.ts";
-import {createGlslEffect, type UniformMap} from "../glsl-effect.ts";
+import {FRAGMENT_GLSL as snowfallFragment, options as snowfallOptions} from "./snowfall.ts";
+import {createGlslEffect, type GlslEffectInstance, type UniformMap} from "../glsl-effect.ts";
 
 const FRAGMENT_GLSL = `
 precision highp float;
@@ -113,20 +113,39 @@ function toUniforms(values: SnowValues): UniformMap {
   };
 }
 
-function createSnowShader(el: Element, values: SnowValues): EffectInstance {
-  return createGlslEffect(el, {
+function toSnowfallUniforms(values: SnowValues): UniformMap {
+  return {
+    layers: values.layers,
+    depth: values.depth,
+    width: values.width,
+    speed: values.drift,
+  };
+}
+
+function createSnowShader(canvas: HTMLCanvasElement, values: SnowValues): GlslEffectInstance {
+  return createGlslEffect(canvas, {
     fragment: FRAGMENT_GLSL,
     values,
     toUniforms,
-    speedOf: v => v.speed,
+    speedOf: (v) => v.speed,
+  });
+}
+
+function createSnowfallShader(canvas: HTMLCanvasElement, values: SnowValues): GlslEffectInstance {
+  return createGlslEffect(canvas, {
+    fragment: snowfallFragment,
+    values,
+    toUniforms: toSnowfallUniforms,
+    speedOf: (v) => v.speed,
   });
 }
 
 // Each preset runs its own shader: this wrapper swaps the underlying shader
-// effect when the preset option changes, keeping all edited values.
-function create(el: Element, values: SnowValues): EffectInstance {
-  const instantiate = (v: SnowValues): EffectInstance =>
-    v.preset === "snowfall" ? snowfall.create(el, v) : createSnowShader(el, v);
+// effect when the preset option changes, keeping all edited values. The host
+// provides the canvas; preset swaps rebuild the program on it in place.
+function create(canvas: HTMLCanvasElement, values: SnowValues): EffectInstance {
+  const instantiate = (v: SnowValues): GlslEffectInstance =>
+    v.preset === "snowfall" ? createSnowfallShader(canvas, v) : createSnowShader(canvas, v);
 
   let current = values;
   let inner = instantiate(current);
@@ -148,13 +167,12 @@ function create(el: Element, values: SnowValues): EffectInstance {
         inner.update(options);
         return;
       }
-      inner.unmount();
+      inner.stop();
+      // The canvas is reused; teardown releases the old program.
+      inner.teardown();
       inner = instantiate(current);
       if (started)
         inner.start();
-    },
-    unmount(): void {
-      inner.unmount();
     },
   };
 }
