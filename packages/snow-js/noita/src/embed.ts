@@ -160,7 +160,6 @@ export function computeView(
 
 export class Noita {
   options: NoitaOptions;
-  private container: Element;
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D | null;
   private inline: ViewerRuntime | null = null;
@@ -177,28 +176,27 @@ export class Noita {
   private observer: ResizeObserver | null = null;
   private rafId: number | null = null;
 
-  constructor(container: Element, options: Partial<NoitaOptions> = {}) {
+  // The host creates and appends the canvas; this class draws into it and
+  // tracks its box for the render buffer's aspect ratio.
+  constructor(canvas: HTMLCanvasElement, options: Partial<NoitaOptions> = {}) {
     this.options = {...defaults, ...options};
-    this.container = container;
-    this.canvas = document.createElement("canvas");
-    this.canvas.style.display = "block";
-    this.canvas.style.width = "100%";
-    this.canvas.style.height = "100%";
-    const size = bufferSize(container.clientWidth, container.clientHeight);
-    this.canvas.width = size.width;
-    this.canvas.height = size.height;
-    this.ctx = this.canvas.getContext("2d", {alpha: false});
-    container.append(this.canvas);
+    this.canvas = canvas;
+    canvas.style.display = "block";
+    canvas.style.width = "100%";
+    canvas.style.height = "100%";
+    const size = bufferSize(canvas.clientWidth, canvas.clientHeight);
+    canvas.width = size.width;
+    canvas.height = size.height;
+    this.ctx = canvas.getContext("2d", {alpha: false});
     this.observer = new ResizeObserver(() => this.resize());
-    this.observer.observe(container);
+    this.observer.observe(canvas);
     void this.init();
   }
 
-  // The host element's box drives the render buffer's aspect ratio.
   private hostSize() {
     return {
-      width: Math.max(1, this.container.clientWidth),
-      height: Math.max(1, this.container.clientHeight),
+      width: Math.max(1, this.canvas.clientWidth),
+      height: Math.max(1, this.canvas.clientHeight),
     };
   }
 
@@ -487,17 +485,5 @@ export class Noita {
       cancelAnimationFrame(this.rafId);
       this.rafId = null;
     }
-  }
-  unmount() {
-    this.disposed = true;
-    if (this.resizeTimer !== null) {
-      clearTimeout(this.resizeTimer);
-      this.resizeTimer = null;
-    }
-    this.stop();
-    this.inline = null;
-    this.observer?.disconnect();
-    this.observer = null;
-    this.canvas.parentNode?.removeChild(this.canvas);
   }
 }

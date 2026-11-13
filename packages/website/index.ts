@@ -41,7 +41,8 @@ let currentForm: (() => void) | null = null;
 function activate(key: string): void {
   currentForm?.();
   currentForm = null;
-  current?.instance.unmount();
+  current?.instance.stop();
+  effectContainer.replaceChildren();
   current = null;
   if (optionsFolder !== null) {
     pane.remove(optionsFolder);
@@ -50,7 +51,10 @@ function activate(key: string): void {
   const def = getEffect(key);
   if (def === undefined)
     return;
-  const instance = createEffect(effectContainer, key);
+  // The host owns the canvas: create, append, then hand it to the effect.
+  const canvas = document.createElement("canvas");
+  effectContainer.append(canvas);
+  const instance = createEffect(canvas, key);
   // Noita renders its own background; shader effects ignore the key.
   instance.update({background: backgroundConfig.color});
   instance.start();

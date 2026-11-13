@@ -14,7 +14,7 @@ describe("defineEffect", () => {
   const def = defineEffect({
     label: "Test",
     options: schema,
-    create: () => ({start() {}, stop() {}, update() {}, unmount() {}}),
+    create: () => ({start() {}, stop() {}, update() {}}),
   });
 
   test("injects keys in schema order", () => {

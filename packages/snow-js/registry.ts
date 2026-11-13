@@ -30,12 +30,12 @@ export function getEffect(key: string): EffectDefinition | undefined {
 // Known keys get options checked against the effect's own schema; any other
 // string key (e.g. a host UI's dropdown) is accepted with the erased bag.
 export function createEffect<K extends EffectKey>(
-  el: Element,
+  canvas: HTMLCanvasElement,
   key: K | (string & {}),
   options?: Partial<OptionsForKey<K>>,
 ): EffectInstance {
   const ef = getEffect(key);
   if (ef === undefined)
     throw new RangeError(`Unknown effect: ${key}`);
-  return ef.create(el, options);
+  return ef.create(canvas, options);
 }

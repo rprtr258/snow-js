@@ -5,6 +5,13 @@ import type {EffectInstance, OptionValues} from "./effect.ts";
 
 export type UniformMap = Record<string, number | [number, number, number, number]>;
 
+// EffectInstance plus a teardown for hosts that keep the canvas and need to
+// release the GL resources before building a new effect on it (the snow
+// wrapper's preset swap).
+export type GlslEffectInstance = EffectInstance & {
+  teardown(): void,
+};
+
 export type GlslEffectParams<V extends OptionValues> = {
   fragment: string,
   values: V,
@@ -13,22 +20,10 @@ export type GlslEffectParams<V extends OptionValues> = {
   speedOf: (values: V) => number,
 };
 
-function createCanvasNode(el: Element): HTMLCanvasElement {
-  if (el instanceof HTMLCanvasElement) {
-    if (!el.isConnected)
-      document.body.append(el);
-    return el;
-  }
-  const canvas = document.createElement("canvas");
-  el.append(canvas);
-  return canvas;
-}
-
-export function createGlslEffect<V extends OptionValues>(el: Element, params: GlslEffectParams<V>): EffectInstance {
+export function createGlslEffect<V extends OptionValues>(canvas: HTMLCanvasElement, params: GlslEffectParams<V>): GlslEffectInstance {
   let values = params.values;
   let uniforms = params.toUniforms(values);
   let time = 0;
-  const canvas = createCanvasNode(el);
   const gl = createGL(
     canvas,
     VERTEX_GLSL,
@@ -58,9 +53,9 @@ export function createGlslEffect<V extends OptionValues>(el: Element, params: Gl
       values = {...values, ...options};
       uniforms = params.toUniforms(values);
     },
-    unmount(): void {
+    teardown(): void {
       gl.running = false;
-      canvas.parentNode?.removeChild(canvas);
+      gl.dispose();
     },
   };
 }

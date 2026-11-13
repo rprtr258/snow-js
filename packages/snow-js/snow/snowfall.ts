@@ -1,10 +1,9 @@
 // Layered snowfall ("light snow" / "blizzard" shadertoy adaptation,
 // https://www.shadertoy.com/view/ldsGDn). Own shader module, consumed by the
 // snow effect's "snowfall" preset; not a standalone registry entry.
-import {defineEffect, num, type InferOptions} from "../effect.ts";
-import {createGlslEffect, type UniformMap} from "../glsl-effect.ts";
+import {num} from "../effect.ts";
 
-const FRAGMENT_GLSL = `
+export const FRAGMENT_GLSL = `
 precision highp float;
 
 uniform float iTime;
@@ -53,24 +52,3 @@ export const options = {
   drift: num(0.6, {label: "drift speed", min: 0.6, max: 1.5}),
   speed: num(10, {label: "speed", min: 0, max: 20}),
 };
-type SnowfallValues = InferOptions<typeof options>;
-
-function toUniforms(values: SnowfallValues): UniformMap {
-  return {
-    layers: values.layers,
-    depth: values.depth,
-    width: values.width,
-    speed: values.drift,
-  };
-}
-
-export default defineEffect({
-  label: "Snowfall",
-  options,
-  create: (el, values) => createGlslEffect(el, {
-    fragment: FRAGMENT_GLSL,
-    values,
-    toUniforms,
-    speedOf: (v) => v.speed,
-  }),
-});

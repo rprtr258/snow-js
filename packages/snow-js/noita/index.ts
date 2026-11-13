@@ -92,5 +92,5 @@ type NoitaValues = InferOptions<typeof options>;
 export default defineEffect({
   label: "Noita",
   options,
-  create: (el, values: NoitaValues) => new Noita(el, values),
+  create: (canvas, values: NoitaValues) => new Noita(canvas, values),
 });
