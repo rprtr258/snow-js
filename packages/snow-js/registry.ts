@@ -1,5 +1,6 @@
 // The effect registry: every effect the library ships, in dropdown order.
 import type {EffectDefinition, EffectInstance} from "./effect.ts";
+import appleLogo from "./apple-logo/index.ts";
 import balatro from "./balatro/index.ts";
 import creation from "./creation/index.ts";
 import fluid from "./fluid/index.ts";
@@ -14,6 +15,7 @@ export const EFFECTS = {
   fluid,
   noita,
   balatro,
+  appleLogo,
 };
 
 export type EffectKey = (keyof typeof EFFECTS);
