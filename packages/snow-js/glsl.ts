@@ -31,12 +31,14 @@ function createShader(ctx: WebGLRenderingContext, type: GLenum, source: string):
   return shader;
 }
 
+/* eslint-disable @stylistic/list-style -- the vertex buffer is deliberately laid out as x,y,z rows */
 const positions = [
   -1.0, -1.0, 1.0,
   -1.0, -1.0, 1.0,
   -1.0,  1.0, 1.0,
   -1.0,  1.0, 1.0,
 ];
+/* eslint-enable @stylistic/list-style */
 
 type GL = {
   ctx: WebGLRenderingContext,

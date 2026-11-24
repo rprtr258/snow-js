@@ -32,13 +32,19 @@ export default defineConfig([
       import: importPlugin,
     },
     rules: {
-      "object-curly-spacing": ["error", "never"],
-      "semi": ["error", "always"],
-      "comma-dangle": ["error", "always-multiline"],
+      "@stylistic/list-style": ["error", {
+        empty: "ignore",
+        singleLine: {"spacing": "never"},
+        multiLine: {"minItems": 0},
+        // the rule's defaultOptions force "always" spacing inside "{}";
+        // this repo's house style is compact braces, so re-pin it here.
+        overrides: {"{}": {singleLine: {"spacing": "never"}}},
+      }],
+      "@stylistic/comma-dangle": ["error", "always-multiline"],
       "@stylistic/semi": ["error", "always"],
       "@stylistic/member-delimiter-style": ["error", {
-        "multiline": {delimiter: "comma", requireLast: true},
-        "singleline": {delimiter: "comma", requireLast: false},
+        multiline: {delimiter: "comma", requireLast: true},
+        singleline: {delimiter: "comma", requireLast: false},
       }],
       "import/extensions": ["error", "always"],
       "@typescript-eslint/no-unused-vars": ["error", {
