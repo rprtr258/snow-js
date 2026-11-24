@@ -32,3 +32,8 @@ jobs:
 
       - name: Test
         run: bun test
+
+      - name: GLSL via headless WebGL
+        run: |
+          bunx playwright install --with-deps chromium
+          bun run test:glsl

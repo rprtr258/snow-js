@@ -8,6 +8,7 @@
   "entry": [
     "scripts/*.ts",
     "noita/scripts/*.ts",
-    "*.test.ts"
+    "*.test.ts",
+    "*.webgl.ts"
   ]
 }

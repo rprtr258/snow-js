@@ -1,8 +1,8 @@
 // Psychedelic tunnel (http://www.pouet.net/prod.php?which=57245).
 import {defineEffect, num} from "../effect.ts";
-import {createGlslEffect} from "../glsl-effect.ts";
+import {createGlslEffect, GlslEffectParams} from "../glsl-effect.ts";
 
-const FRAGMENT_GLSL = `
+const fragment = `
 precision highp float;
 
 uniform float iTime;
@@ -33,17 +33,18 @@ void main(void) {
 }
 `;
 
-const options = {
+export const options = {
   speed: num(10, {label: "speed", min: 0, max: 20}),
+};
+
+export const glsl: GlslEffectParams<typeof options> = {
+  fragment,
+  toUniforms: () => ({}),
+  speedOf: v => v.speed,
 };
 
 export default defineEffect({
   label: "Creation",
   options,
-  create: (el, values) => createGlslEffect(el, {
-    fragment: FRAGMENT_GLSL,
-    values,
-    toUniforms: () => ({}),
-    speedOf: (v) => v.speed,
-  }),
+  create: (canvas, values) => createGlslEffect(canvas, values, glsl),
 });

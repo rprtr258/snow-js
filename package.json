@@ -8,6 +8,7 @@
     "check:wasm": "cd ./packages/snow-js && bun scripts/build-render-kernel.ts noita galaxy --check",
     "build:wasm": "cd ./packages/snow-js && bun scripts/build-render-kernel.ts noita galaxy",
     "dev:website": "bun run --filter='./packages/website' dev",
+    "test:glsl": "bun run --filter='./packages/snow-js' test:glsl",
     "lint": "bun run --filter='./packages/*' lint",
     "typecheck": "bun run --filter='./packages/*' typecheck",
     "lint:fix": "bun run --filter='./packages/*' lint:fix"

@@ -15,6 +15,7 @@ bun run lint:fix
 bun run typecheck          # bun check, both packages
 bun run check:wasm         # CI: committed wasm matches src/render-kernel.wat
 bun test                   # all workspaces; ~6s: schema, noita kernel, render snapshot tests
+bun run test:glsl          # real-WebGL shader gate in headless Chromium (first run: bunx playwright install chromium)
 ```
 
 CI (PRs and pushes to `master`) runs: check:wasm, lint, typecheck, website

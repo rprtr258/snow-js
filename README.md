@@ -59,29 +59,28 @@ bun run dev:website   # website with the tweakpane playground
 ## Adding a new effect
 
 1. Create `packages/snow-js/<name>/index.ts` with a default-exported
-   definition. The option schema is a plain object built from the `num` /
-   `bool` / `color` / `select` / `action` helpers; defaults live in the schema
-   and `InferOptions` derives the options struct from it:
+  definition. The option schema is a plain object built from the `num` /
+  `bool` / `color` / `select` / `action` helpers; defaults live in the schema
+  and `InferOptions` derives the options struct from it:
 
-   ```ts
-   import {defineEffect, num} from "../effect.ts";
-   import {createGlslEffect} from "../glsl-effect.ts";
+  ```ts
+  import {defineEffect, num} from "../effect.ts";
+  import {createGlslEffect} from "../glsl-effect.ts";
 
-   const options = {
-     speed: num(10, {label: "speed", min: 0, max: 20}),
-   };
+  const options = {
+    speed: num(10, {label: "speed", min: 0, max: 20}),
+  };
 
-   export default defineEffect({
-     label: "My effect",
-     options,
-     create: (canvas, values) => createGlslEffect(canvas, {
-       fragment: FRAGMENT_GLSL,
-       values,
-       toUniforms: () => ({}),
-       speedOf: (v) => v.speed,
-     }),
-   });
-   ```
+  export default defineEffect({
+    label: "My effect",
+    options,
+    create: (canvas, values) => createGlslEffect(canvas, values, {
+      fragment: FRAGMENT_GLSL,
+      toUniforms: () => ({}),
+      speedOf: (v) => v.speed,
+    }),
+  });
+  ```
 
 2. Register it in `packages/snow-js/registry.ts` (`EFFECTS` object).
 
