@@ -3,7 +3,7 @@
 // snow effect's "snowfall" preset; not a standalone registry entry.
 import {num} from "../effect.ts";
 
-export const FRAGMENT_GLSL = `
+export const fragment = `
 precision highp float;
 
 uniform float iTime;

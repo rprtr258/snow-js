@@ -4,8 +4,12 @@ import balatro from "./balatro/index.ts";
 import creation from "./creation/index.ts";
 import fluid from "./fluid/index.ts";
 import galaxy from "./galaxy/index.ts";
+import heavenly from "./heavenly/index.ts";
+import marbles from "./marbles/index.ts";
+import multibox from "./multibox/index.ts";
 import noita from "./noita/index.ts";
 import snow from "./snow/index.ts";
+import tiles from "./tiles/index.ts";
 
 export const EFFECTS = {
   snow,
@@ -14,6 +18,10 @@ export const EFFECTS = {
   fluid,
   noita,
   balatro,
+  multibox,
+  tiles,
+  marbles,
+  heavenly,
 };
 
 export type EffectKey = (keyof typeof EFFECTS);

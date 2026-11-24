@@ -3,10 +3,10 @@
 // and options live in ./snowfall.ts. The preset option picks which
 // shader runs; option visibility follows it.
 import {bool, defineEffect, num, select, EffectInstance, InferOptions, OptionValues} from "../effect.ts";
-import {FRAGMENT_GLSL as snowfallFragment, options as snowfallOptions} from "./snowfall.ts";
+import {fragment as snowfallFragment, options as snowfallOptions} from "./snowfall.ts";
 import {createGlslEffect, GlslEffectParams, GlslEffectInstance, UniformMap} from "../glsl-effect.ts";
 
-const FRAGMENT_GLSL = `
+const fragment = `
 precision highp float;
 
 uniform float iTime;
@@ -125,7 +125,7 @@ function toSnowfallUniforms(values: SnowValues): UniformMap {
 const speedOf = (v: SnowValues) => v.speed;
 
 export const glsl: Record<SnowPreset, GlslEffectParams<typeof options>> = {
-  snow: {fragment: FRAGMENT_GLSL, toUniforms, speedOf},
+  snow: {fragment, toUniforms, speedOf},
   snowfall: {fragment: snowfallFragment, toUniforms: toSnowfallUniforms, speedOf},
 };
 

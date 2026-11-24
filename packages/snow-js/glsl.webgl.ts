@@ -11,6 +11,10 @@ import {VERTEX_GLSL} from "./glsl.ts";
 import balatro, {glsl as balatroGlsl, options as balatroOptions} from "./balatro/index.ts";
 import creation, {glsl as creationGlsl, options as creationOptions} from "./creation/index.ts";
 import snow, {glsl as snowGlsl, options as snowOptions} from "./snow/index.ts";
+import multibox, {glsl as multiboxGlsl, options as multiboxOptions} from "./multibox/index.ts";
+import tiles, {glsl as tilesGlsl, options as tilesOptions} from "./tiles/index.ts";
+import marbles, {glsl as marblesGlsl, options as marblesOptions} from "./marbles/index.ts";
+import heavenly, {glsl as heavenlyGlsl, options as heavenlyOptions} from "./heavenly/index.ts";
 
 type GlPayload = {vertex: string, fragment: string, uniforms: UniformMap};
 type GlReport = {fatal?: string, problems: string[], errors: string[]};
@@ -146,6 +150,10 @@ const cases: GlslCase[] = [
   glslCase(creation.label, creationOptions, creationGlsl),
   glslCase(`${snow.label} (snow preset)`, snowOptions, snowGlsl.snow),
   glslCase(`${snow.label} (snowfall preset)`, snowOptions, snowGlsl.snowfall),
+  glslCase(multibox.label, multiboxOptions, multiboxGlsl),
+  glslCase(tiles.label, tilesOptions, tilesGlsl),
+  glslCase(marbles.label, marblesOptions, marblesGlsl),
+  glslCase(heavenly.label, heavenlyOptions, heavenlyGlsl),
 ];
 
 test.describe("webgl shaders", () => {
