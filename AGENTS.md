@@ -35,7 +35,8 @@ commit the new `static/assets/render-kernel.wasm` (CI fails on stale wasm).
 - `index.ts` — public API re-exports; keep new exports here.
 - `glsl.ts` / `glsl-effect.ts` — WebGL quad renderer + shared lifecycle for
   fragment-shader effects (time accumulation, uniform updates).
-- Effects: `snow/` (presets `snow` and `snowfall`), `creation/`, `noita/`.
+- Effects: one folder per effect under `packages/snow-js/<name>/` — see each
+  effect's source for its implementation and options.
 - `noita/src/` — ported Noita simulation + software renderer; `embed.ts` is the
   browser-side embed and the only file the registry layer drives.
   `noita/static/assets/` holds committed wasm + effect catalog read at runtime.
