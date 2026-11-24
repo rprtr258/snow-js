@@ -18,6 +18,9 @@ jobs:
       - name: Install deps
         run: bun install
 
+      - name: Install chromium for render comparison tests
+        run: cd packages/snow-js && bunx playwright install --with-deps chromium
+
       - name: Check wasm build
         run: bun check:wasm
 
