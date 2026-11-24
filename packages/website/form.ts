@@ -44,10 +44,13 @@ export function buildEffectForm(
   let rebuildScheduled = false;
   let disposed = false;
 
-  for (const spec of def.options) {
-    if (spec.kind === "color" && spec.default === null)
-      mirrors[spec.key] = {enabled: false, color: "#ffffff"};
+  function initMirrors(): void {
+    for (const spec of def.options) {
+      if (spec.kind === "color" && spec.default === null)
+        mirrors[spec.key] = {enabled: false, color: "#ffffff"};
+    }
   }
+  initMirrors();
 
   function bindNumber(spec: Extract<KeyedSpec, {kind: "number"}>): void {
     const blade = folder.addBinding(values, spec.key, {
@@ -125,6 +128,18 @@ export function buildEffectForm(
     disposers.push(() => folder.remove(button));
   }
 
+  // Blades don't re-read their bound object, so restoring the defaults needs
+  // a rebuild to show up; dynamic selects are re-resolved against the default
+  // values first, since their choices may differ for them.
+  function resetToDefaults(): void {
+    Object.assign(values, initialValues(def));
+    initMirrors();
+    const pending: OptionValues = {...values};
+    resolveSelects(pending);
+    scheduleRebuild();
+    onChange(pending);
+  }
+
   function addAll(): void {
     for (const opt of def.options) {
       switch (opt.kind) {
@@ -137,6 +152,9 @@ export function buildEffectForm(
       }
     }
     applyVisibility();
+    const resetButton = folder.addButton({title: "reset"});
+    resetButton.on("click", () => resetToDefaults());
+    disposers.push(() => folder.remove(resetButton));
   }
 
   // Dynamic selects may yield different choices (e.g. noita's effect list
