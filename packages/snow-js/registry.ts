@@ -1,5 +1,6 @@
 // The effect registry: every effect the library ships, in dropdown order.
 import type {EffectDefinition, EffectInstance} from "./effect.ts";
+import balatro from "./balatro/index.ts";
 import creation from "./creation/index.ts";
 import fluid from "./fluid/index.ts";
 import galaxy from "./galaxy/index.ts";
@@ -12,6 +13,7 @@ export const EFFECTS = {
   galaxy,
   fluid,
   noita,
+  balatro,
 };
 
 export type EffectKey = (keyof typeof EFFECTS);

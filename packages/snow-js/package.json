@@ -29,6 +29,7 @@
     "registry.ts",
     "glsl.ts",
     "creation",
+    "balatro",
     "glsl-effect.ts",
     "snow",
     "noita",
