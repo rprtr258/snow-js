@@ -1,10 +1,11 @@
 // Balatro menu background: pixelated tri-colour liquid swirl. Ported from
 // localthunk's Balatro background shader (https://www.shadertoy.com/view/XXtBRr,
 // shadertoy port by xxidbr9).
-import {bool, color, defineEffect, num} from "../effect.ts";
-import {createGlslEffect} from "../glsl-effect.ts";
+import {defineEffect, bool, color, num} from "../effect.ts";
+import {createGlslEffect, GlslEffectParams} from "../glsl-effect.ts";
+import {channelsOf} from "../utils.ts";
 
-const FRAGMENT_GLSL = `
+const fragment = `
 precision highp float;
 
 uniform float iTime;
@@ -63,17 +64,7 @@ void main(void) {
 }
 `;
 
-// #rrggbb → normalised RGBA, opaque like the shader's original vec4 colour defines.
-function channelsOf(hex: string): [number, number, number, number] {
-  return [
-    Number.parseInt(hex.slice(1, 3), 16) / 255,
-    Number.parseInt(hex.slice(3, 5), 16) / 255,
-    Number.parseInt(hex.slice(5, 7), 16) / 255,
-    1,
-  ];
-}
-
-const options = {
+export const options = {
   speed: num(1, {label: "speed", min: 0, max: 5, step: 0.1}),
   spinRotation: num(-2, {label: "spin rotation", min: -10, max: 10, step: 0.1}),
   spinSpeed: num(7, {label: "spin speed", min: 0, max: 20, step: 0.1}),
@@ -90,30 +81,31 @@ const options = {
   rotate: bool(false, {label: "rotate"}),
 };
 
+export const glsl: GlslEffectParams<typeof options> = {
+  fragment,
+  toUniforms: v => ({
+    spinRotation: v.spinRotation,
+    spinSpeed: v.spinSpeed,
+    offsetX: v.offsetX,
+    offsetY: v.offsetY,
+    colour1: channelsOf(v.color1),
+    colour2: channelsOf(v.color2),
+    colour3: channelsOf(v.color3),
+    contrast: v.contrast,
+    lighting: v.lighting,
+    spinAmount: v.spinAmount,
+    pixelFilter: v.pixelFilter,
+    spinEase: v.spinEase,
+    isRotate: v.rotate ? 1 : 0,
+  }),
+  // glsl-effect advances iTime by speedOf/1000 per frame; 1000/60 makes one
+  // speed unit equal one shader-second at 60 fps.
+  speedOf: v => v.speed * 1000 / 60,
+};
+
 export default defineEffect({
   label: "Balatro",
   description: "Pixelated swirling liquid from Balatro's menu background.",
   options,
-  create: (el, values) => createGlslEffect(el, {
-    fragment: FRAGMENT_GLSL,
-    values,
-    toUniforms: (v) => ({
-      spinRotation: v.spinRotation,
-      spinSpeed: v.spinSpeed,
-      offsetX: v.offsetX,
-      offsetY: v.offsetY,
-      colour1: channelsOf(v.color1),
-      colour2: channelsOf(v.color2),
-      colour3: channelsOf(v.color3),
-      contrast: v.contrast,
-      lighting: v.lighting,
-      spinAmount: v.spinAmount,
-      pixelFilter: v.pixelFilter,
-      spinEase: v.spinEase,
-      isRotate: v.rotate ? 1 : 0,
-    }),
-    // glsl-effect advances iTime by speedOf/1000 per frame; 1000/60 makes one
-    // speed unit equal one shader-second at 60 fps.
-    speedOf: (v) => v.speed * 1000 / 60,
-  }),
+  create: (canvas, values) => createGlslEffect(canvas, values, glsl),
 });

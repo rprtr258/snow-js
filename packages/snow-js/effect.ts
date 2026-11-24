@@ -98,7 +98,7 @@ export function action(label: string, run: (instance: EffectInstance) => void): 
 }
 
 // Schema → plain values bridge (spec defaults keyed by option key).
-function resolveDefaults<S extends OptionsSchema>(options: S): InferOptions<S> {
+export function resolveDefaults<S extends OptionsSchema>(options: S): InferOptions<S> {
   const values: Record<string, number | boolean | string | null> = {};
   for (const [key, spec] of Object.entries(options)) {
     if (spec.kind === "action")
