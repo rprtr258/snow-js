@@ -7,6 +7,7 @@ import galaxy from "./galaxy/index.ts";
 import heavenly from "./heavenly/index.ts";
 import marbles from "./marbles/index.ts";
 import multibox from "./multibox/index.ts";
+import nebulaTriangles from "./nebula-triangles/index.ts";
 import noita from "./noita/index.ts";
 import snow from "./snow/index.ts";
 import tiles from "./tiles/index.ts";
@@ -16,6 +17,7 @@ export const EFFECTS = {
   creation,
   galaxy,
   fluid,
+  nebulaTriangles,
   noita,
   balatro,
   multibox,

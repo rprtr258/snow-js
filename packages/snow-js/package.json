@@ -32,6 +32,9 @@
     "balatro",
     "glsl-effect.ts",
     "snow",
+    "nebula-triangles",
+    "!nebula-triangles/*.test.ts",
+    "!nebula-triangles/reference.png",
     "noita",
     "!noita/**/*.test.ts",
     "!noita/**/__snapshots__",
@@ -52,6 +55,7 @@
     "eslint-plugin-import": "^2.32.0",
     "jiti": "^2.7.0",
     "knip": "^6.48.0",
+    "playwright": "^1.65.1",
     "typescript-eslint": "^8.74.0",
     "wabt": "1.0.39"
   }
